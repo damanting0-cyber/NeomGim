@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.4.0
+// @version      1.5.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.4.0';
+  const VERSION = '1.5.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -80,7 +80,6 @@
     preload: true,
     mergeTitles: true,
     typeFx: true,
-    browseMin: 4,
     jSort: 'date',
   };
   const settings = Object.assign({}, SETTING_DEFAULTS, store.get(KEY.settings, {}));
@@ -284,7 +283,11 @@
     if (document.hidden) { flushDates(); writeThumbs(); writeTerms(); }
   });
 
-  const LIST_BG_CSS = IS_WORK_PAGE ? '' : 'html, body { background-color: #111111 !important; }';
+  // 목록 페이지: 히토미 원래 UI는 처음부터 투명하게 두고, 작품 목록과 이 스크립트가 만든 것만 보이게 한다
+  const LIST_BG_CSS = IS_WORK_PAGE ? '' : `n    html, body { background-color: #111111 !important; }
+    body { visibility: hidden !important; }
+    .gallery-content, #hk-sentinel, #hk-bg, .page-container { visibility: visible !important; }
+  `;
 
   const SITE_CSS = `
     ${LIST_BG_CSS}
@@ -315,12 +318,10 @@
     .gallery-content > div[data-hk-done]::before {
       content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 0;
       border-radius: 18px; pointer-events: none; background-color: #1e1e22;
-      background-image: linear-gradient(to top, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0));
-      background-repeat: no-repeat; background-size: 100% 60%;
-      animation: hkLoad 1.6s ease-in-out infinite;
-      transition: opacity .4s ease;
+      background-image: linear-gradient(to top, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.12));
+      animation: hkPulse 1.1s ease-in-out infinite alternate;
     }
-    .gallery-content > div[data-hk-done].hk-img-ok::before { opacity: 0; }
+    .gallery-content > div[data-hk-done].hk-img-ok::before { animation: hkGone .4s ease forwards; }
     .gallery-content > div:not([data-hk-done]):not(.hk-slot) {
       position: relative !important; aspect-ratio: 3 / 4; overflow: hidden !important; border-radius: 18px;
     }
@@ -328,11 +329,12 @@
     .gallery-content > div:not([data-hk-done]):not(.hk-slot)::before {
       content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 0;
       border-radius: 18px; pointer-events: none; background-color: #1e1e22;
-      background-image: linear-gradient(to top, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0));
-      background-repeat: no-repeat; background-size: 100% 60%;
-      animation: hkLoad 1.6s ease-in-out infinite;
+      background-image: linear-gradient(to top, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.12));
+      animation: hkPulse 1.1s ease-in-out infinite alternate;
     }
-    @keyframes hkLoad { from { background-position: 0 120%; } to { background-position: 0 -40%; } }
+    /* 로딩 표시는 opacity만 움직여서(합성 단계에서 처리) 스크롤 중 프레임이 덜 떨어지게 한다 */
+    @keyframes hkPulse { from { opacity: .45; } to { opacity: 1; } }
+    @keyframes hkGone { from { opacity: 1; } to { opacity: 0; } }
     .gallery-content > div[data-hk-done] {
       position: relative !important;
       border-radius: 18px; overflow: visible;
@@ -760,8 +762,7 @@
     .tfl {
       position: absolute; left: 3px; right: 3px; bottom: 3px; z-index: 2;
       display: flex; align-items: center; gap: 4px; height: 34px; padding: 0 3px 0 11px;
-      border-radius: 999px; background: rgba(20, 20, 26, 0.5);
-      -webkit-backdrop-filter: blur(10px) saturate(130%); backdrop-filter: blur(10px) saturate(130%);
+      border-radius: 999px; background: rgba(20, 20, 26, 0.74);
       border: 1px solid rgba(255, 255, 255, 0.24); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
       transition: transform .3s var(--ease);
     }
@@ -777,7 +778,24 @@
     .tfl .tx:active { background: rgba(255, 90, 90, 0.85); transform: scale(.86); }
     .ibs.on { color: #ffd54a; background: rgba(255, 213, 74, 0.16); border-color: rgba(255, 213, 74, 0.45); }
     .tog.inl { min-height: 40px; margin-top: 10px; }
-    .panel.cpop {
+    .cdel {
+      position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 3;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+      padding: 8px; border-radius: inherit; background: rgba(14, 14, 18, 0.84);
+      animation: hkSwap .24s var(--ease); transition: opacity .18s ease;
+    }
+    .cdel.out { opacity: 0; }
+    .cdel .cq { color: #fff; font-size: 12.5px; font-weight: 700; text-align: center; line-height: 1.35; }
+    .cdel .cbtns { display: flex; gap: 6px; }
+    .cdel .cb {
+      -webkit-appearance: none; appearance: none; cursor: pointer;
+      height: 30px; padding: 0 12px; border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.12);
+      color: #fff; font: inherit; font-size: 12px; font-weight: 600;
+      transition: transform .3s var(--ease);
+    }
+    .cdel .cb.yes { background: rgba(255, 90, 90, 0.9); border-color: transparent; }
+    .cdel .cb:active { transform: scale(.9); transition-duration: .1s; }    .panel.cpop {
       position: fixed; left: 0; top: 0; z-index: 3; width: 300px;
       padding: 14px; border-radius: 22px; max-height: 60vh;
       background: rgba(24, 24, 28, 0.82) !important;
@@ -801,7 +819,7 @@
     .row + .row, .row + .list, .lbl + .row, .row + .lbl, .hint + .lbl { margin-top: 8px; }
     .row.wrap-row { flex-wrap: wrap; }
     .list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 2px 2px; }
+    .acts { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 0 2px 2px; }
     .ibs {
       -webkit-appearance: none; appearance: none; border: 1px solid rgba(255, 255, 255, 0.2);
       background: rgba(255, 255, 255, 0.14); cursor: pointer;
@@ -1114,25 +1132,23 @@
     return box;
   }
 
-  function addSaved(id, title, alias, stars, arts, pick) {
+  function addSaved(id, title, alias, stars, arts) {
     if (isSaved(id)) return false;
     saved.unshift({
       id, title: title || '', alias: alias || '',
       stars: Math.max(0, Math.min(5, Math.round(+stars || 0))),
       arts: Array.isArray(arts) ? arts.slice(0, 16) : [],
-      pick: !!pick,
       ts: Date.now()
     });
     saveList();
     return true;
   }
 
-  function updateSaved(id, alias, stars, arts, pick) {
+  function updateSaved(id, alias, stars, arts) {
     const it = savedOf(id);
     if (!it) return false;
     it.alias = alias || '';
     it.stars = Math.max(0, Math.min(5, Math.round(+stars || 0)));
-    if (pick != null) it.pick = !!pick;
     if (Array.isArray(arts) && arts.length) it.arts = arts.slice(0, 16);
     saveList();
     return true;
@@ -1605,7 +1621,6 @@
     watched = store.get(KEY.watched, []);
     saved = store.get(KEY.saved, []);
     refreshViewed();
-    applyBrowseFilter();
   });
 
   const TAXO_RE = /^\/(tag|artist|group|series|character)\/(.+)-[a-z]+\.html/i;
@@ -1630,244 +1645,6 @@
     info = { artists, groups, tags };
     CARD_META.set(card, info);
     return info;
-  }
-
-  // ── 둘러보기 모아보기: 일지 작가들의 작품 품번을 합쳐서 홈 목록 대신 보여준다 ──
-  const FEED_SS = 'hk_feed';
-  const FEED_PER = 25;
-  let feed = null; // { ids: number[], pos: 불러온 개수, names: string[] }
-
-  function writeFeed() {
-    try {
-      if (feed) sessionStorage.setItem(FEED_SS, JSON.stringify(feed));
-      else sessionStorage.removeItem(FEED_SS);
-    } catch (e) {}
-  }
-  if (currentSort() && settings.infinite) {
-    try {
-      const o = JSON.parse(sessionStorage.getItem(FEED_SS) || 'null');
-      if (o && Array.isArray(o.ids) && o.ids.length) feed = { ids: o.ids, pos: +o.pos || 0, names: o.names || [] };
-    } catch (e) {}
-  }
-
-  // 모아보기 중에는 원래 홈 카드를 숨긴다
-  function applyBrowseFilter() {
-    document.querySelectorAll('.gallery-content > div').forEach(card => {
-      card.classList.toggle('hk-artsoff', !!feed && !card.dataset.hkFeed && !card.classList.contains('hk-slot'));
-    });
-  }
-
-  function gmGetBuf(url) {
-    return new Promise((res, rej) => {
-      if (typeof GM_xmlhttpRequest !== 'function') { rej(new Error('no gm')); return; }
-      GM_xmlhttpRequest({
-        method: 'GET', url, responseType: 'arraybuffer', timeout: 10000,
-        ontimeout: () => rej(new Error('timeout')),
-        onload: r => (r.status >= 200 && r.status < 300 && r.response ? res(r.response) : rej(new Error('HTTP ' + r.status))),
-        onerror: () => rej(new Error('network'))
-      });
-    });
-  }
-
-  function getBuf(url) {
-    return fetchT(url, { credentials: 'omit' }, 10000)
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
-      .catch(err => {
-        const msg = String(err && err.message || err);
-        if (/HTTP 404/.test(msg)) throw err;
-        return gmGetBuf(url);
-      });
-  }
-
-  function poolMap(arr, n, fn) {
-    const out = new Array(arr.length);
-    let i = 0;
-    const run = async () => {
-      while (i < arr.length) {
-        const k = i++;
-        try { out[k] = await fn(arr[k], k); } catch (e) { out[k] = null; }
-      }
-    };
-    return Promise.all(Array.from({ length: Math.min(n, arr.length) }, run)).then(() => out);
-  }
-
-  // 작가 한 명의 한국어 작품 품번 목록 (.nozomi: 4바이트 빅엔디언 정수 배열)
-  async function artistNozomi(name) {
-    const low = String(name || '').toLowerCase().trim();
-    const variants = Array.from(new Set([low, low.replace(/\s+/g, '_')]));
-    for (const v of variants) {
-      for (const pre of ['n/artist/', 'artist/']) {
-        const url = 'https://ltn.hitomi.la/' + pre + encodeURIComponent(v) + '-' + LANG + '.nozomi';
-        try {
-          const buf = await getBuf(url);
-          const dv = new DataView(buf);
-          const out = [];
-          for (let i = 0; i + 4 <= buf.byteLength; i += 4) out.push(dv.getInt32(i, false));
-          hlog('모아보기: 목록', name, '→', out.length + '개', '(' + pre + v + ')');
-          return out;
-        } catch (e) {
-          hlog('모아보기: 목록 실패', url, String(e && e.message || e));
-        }
-      }
-    }
-    return null;
-  }
-
-  let tnWarned = false;
-  async function fetchBlock(id) {
-    const url = 'https://ltn.hitomi.la/galleryblock/' + id + '.html';
-    let html = '';
-    try {
-      const r = await fetchT(url, { credentials: 'omit' }, 10000);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      html = await r.text();
-    } catch (e) {
-      try { html = await gmGet(url); } catch (e2) {
-        hlog('모아보기: 카드 실패', id, String(e && e.message || e), '/', String(e2 && e2.message || e2));
-        return null;
-      }
-    }
-    try {
-      const w = W();
-      if (typeof w.rewrite_tn_paths === 'function') html = w.rewrite_tn_paths(html);
-      else if (!tnWarned) { tnWarned = true; hlog('모아보기: rewrite_tn_paths 없음 (썸네일 주소 변환 생략)'); }
-    } catch (e) { hlog('모아보기: 썸네일 주소 변환 오류', String(e && e.message || e)); }
-    const tpl = document.createElement('template');
-    tpl.innerHTML = String(html || '').trim();
-    let card = tpl.content.firstElementChild;
-    if (!card) { hlog('모아보기: 카드 HTML 비어 있음', id); return null; }
-    if (card.tagName !== 'DIV') {
-      const d = document.createElement('div');
-      d.appendChild(card);
-      card = d;
-    }
-    if (!card.querySelector('img')) hlog('모아보기: 카드에 이미지 없음', id);
-    if (!Array.from(card.querySelectorAll('a[href]')).some(a => ID_RE.test(a.getAttribute('href')))) {
-      hlog('모아보기: 카드 링크 형식 다름', id, (card.querySelector('a[href]') || {}).outerHTML ? card.querySelector('a[href]').getAttribute('href') : '(링크 없음)');
-    }
-    card.dataset.krChecked = '1';
-    card.dataset.hkFeed = '1';
-    return card;
-  }
-
-  async function feedLoad() {
-    inf.loading = true;
-    inf.stopped = false;
-    setStatus('불러오는 중…');
-    const start = feed.pos;
-    const slice = feed.ids.slice(start, start + FEED_PER);
-    if (!slice.length) {
-      inf.loading = false;
-      inf.stopped = true;
-      inf.restore = 0;
-      setStatus('마지막 작품입니다');
-      return;
-    }
-    const cards = await poolMap(slice, 4, fetchBlock);
-    if (!feed) { inf.loading = false; return; }
-    const page = Math.floor(start / FEED_PER) + 1;
-    let added = 0;
-    cards.forEach(c => {
-      if (!c) return;
-      c.dataset.hkPage = String(page);
-      inf.gc.appendChild(c);
-      added++;
-    });
-    inf.loading = false;
-    hlog('모아보기: 카드', added + ' / ' + slice.length, '(' + (start + slice.length) + ' / ' + feed.ids.length + ')');
-    if (!added) {
-      inf.stopped = true;
-      inf.restore = 0;
-      setStatus('불러오지 못했습니다 · 눌러서 다시 시도');
-      return;
-    }
-    feed.pos = start + slice.length;
-    writeFeed();
-    loadedPages = page;
-    setStatus('');
-    if (inf.restore && feed.pos < inf.restore) setTimeout(loadNext, 0);
-    else { inf.restore = 0; kickInfinite(); }
-  }
-
-  function startFeed(ids, names) {
-    feed = { ids, pos: 0, names };
-    writeFeed();
-    document.querySelectorAll('.gallery-content > div[data-hk-feed]').forEach(c => c.remove());
-    applyBrowseFilter();
-    window.scrollTo(0, 0);
-    if (inf) {
-      inf.pre = null;
-      inf.restore = 0;
-      inf.stopped = false;
-      loadNext();
-    }
-  }
-
-  function stopFeed() {
-    feed = null;
-    writeFeed();
-  }
-
-  function fetchGalleryArtists(gid) {
-    const parse = t => {
-      const s = String(t || '');
-      const i = s.indexOf('{');
-      if (i < 0) return null;
-      try {
-        const o = JSON.parse(s.slice(i).replace(/;\s*$/, ''));
-        if (!o || typeof o !== 'object') return null;
-        if (o.date) noteDate(gid, o.date);
-        return (o.artists || []).map(a => String((a && a.artist) || '').replace(/_/g, ' ').trim()).filter(Boolean);
-      } catch (e) { return null; }
-    };
-    const sources = [
-      () => gmGet('https://ltn.hitomi.la/galleries/' + gid + '.js'),
-      () => fetchT('https://ltn.hitomi.la/galleries/' + gid + '.js', { credentials: 'omit' }, 8000).then(r => (r.ok ? r.text() : '')),
-      () => fetchT('/galleries/' + gid + '.js', { credentials: 'same-origin' }, 8000).then(r => (r.ok ? r.text() : ''))
-    ];
-    const tryAt = i => {
-      if (i >= sources.length) { hlog('작가 정보 실패', gid); return Promise.resolve(null); }
-      return sources[i]().then(parse).then(a => a || tryAt(i + 1)).catch(() => tryAt(i + 1));
-    };
-    return tryAt(0);
-  }
-
-  const hasArts = s => !!(s.artsOk || (Array.isArray(s.arts) && s.arts.length));
-
-  // 일지 목록의 작가를 모은다. 결과: [{ name, ids, stars }] (별점 높은 순)
-  async function collectArtists(list, onProgress) {
-    const queue = list.filter(s => !hasArts(s)).slice(0, 80);
-    const total = queue.length;
-    let done = 0;
-    const walk = async () => {
-      while (queue.length) {
-        const s = queue.shift();
-        const arts = await fetchGalleryArtists(s.id);
-        if (arts) { s.arts = arts.slice(0, 16); s.artsOk = true; }
-        done++;
-        if (onProgress) onProgress(done, total);
-      }
-    };
-    if (total) {
-      await Promise.all(Array.from({ length: Math.min(4, total) }, walk));
-      saveList();
-    }
-    const map = new Map();
-    list.forEach(s => (s.arts || []).forEach(a => {
-      const name = String(a || '').replace(/_/g, ' ').trim();
-      const k = normArtName(name);
-      if (!k) return;
-      let o = map.get(k);
-      if (!o) map.set(k, o = { name, ids: [], stars: 0 });
-      if (o.ids.indexOf(s.id) < 0) o.ids.push(s.id);
-      o.stars = Math.max(o.stars, +s.stars || 0);
-    }));
-    return Array.from(map.values()).sort((a, b) => b.stars - a.stars || b.ids.length - a.ids.length || a.name.localeCompare(b.name));
-  }
-
-  function browseList() {
-    const min = +settings.browseMin || 0;
-    return saved.filter(s => s.pick || (min > 0 && (+s.stars || 0) >= min));
   }
 
   let inf = null;
@@ -1956,14 +1733,13 @@
   }
 
   function prefetchNext() {
-    if (!inf || inf.stopped || inf.pre || slotMode || feed) return;
+    if (!inf || inf.stopped || inf.pre || slotMode) return;
     const n = inf.page + 1;
     inf.pre = { n, p: fetchCards(pageUrl(n), inf.perPage).catch(() => null) };
   }
 
   async function loadNext() {
     if (!inf || inf.loading) return;
-    if (feed) return feedLoad();
     inf.loading = true;
     inf.stopped = false;
     setStatus('불러오는 중…');
@@ -2036,14 +1812,6 @@
     }
 
     Array.from(gc.children).forEach(c => { if (!c.dataset.hkPage) c.dataset.hkPage = '1'; });
-    if (feed) {
-      // 모아보기 복원: 뒤로 왔으면 전에 불러온 만큼 다시 받고, 아니면 처음부터
-      const want = scrollTarget != null ? feed.pos : 0;
-      feed.pos = 0;
-      inf.restore = want;
-      loadNext();
-      return;
-    }
     prefetchNext();
 
     let want = 0;
@@ -2651,7 +2419,6 @@
   ICON.edit = SV('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>');
   ICON.copy = SV('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>');
   ICON.journal = SV('<path class="jb" d="M6.5 3H18v18H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3z"/><path d="M9 3v18"/><path d="M12 8h3.5M12 11.5h3.5"/>');
-  ICON.compass = SV('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>');
 
   const thumbIO = typeof IntersectionObserver === 'function'
     ? new IntersectionObserver(es => {
@@ -2706,7 +2473,7 @@
           <div class="bottom">
             ${curSort ? `
             <button class="filt pill" type="button" id="filt" title="정렬 바꾸기">
-              ${ICON.sort}<span class="fl">${feed ? '둘러보기' : (SORT_KR[curSort] || '')}</span>
+              ${ICON.sort}<span class="fl">${SORT_KR[curSort] || ''}</span>
             </button>` : ''}
             <div class="bar pill" id="bar">
               ${curId ? `
@@ -2911,10 +2678,15 @@
     function animateText(node) {
       if (!settings.typeFx || !node || node.nodeType !== 1) return;
       const list = [node].concat(Array.from(node.querySelectorAll('*')));
+      // 카드 목록·칩·긴 글은 글자를 쪼개지 않는다 (요소 수천 개가 동시에 움직이면 프레임이 떨어짐)
+      let budget = 400;
       list.forEach(e => {
         if (e.dataset.fx || e.classList.contains('hk-ch')) return;
-        if (e.children.length || /^(INPUT|TEXTAREA|SCRIPT|STYLE)$/.test(e.tagName)) return;
-        if (!e.textContent.trim()) return;
+        if (e.children.length || /^(INPUT|TEXTAREA|SCRIPT|STYLE|PRE)$/.test(e.tagName)) return;
+        const len = e.textContent.trim().length;
+        if (!len || len > 80 || len > budget) return;
+        if (e.closest('.list, .chips, .pvgrid, .diag, .tfl, .jbar')) return;
+        budget -= len;
         e.dataset.fx = '1';
         setChars(e, e.textContent);
       });
@@ -3330,34 +3102,73 @@
         del.title = '일지 삭제';
         del.addEventListener('click', e => {
           e.stopPropagation();
-          removeSaved(s.id);
-          updateCounts();
-          renderItems();
+          askCardDelete(tb, '일지를 삭제할까요?', () => removeCard(row, () => {
+            removeSaved(s.id);
+            updateCounts();
+            const cnt = panel.querySelector('#jcount');
+            if (cnt) cnt.textContent = '일지 ' + saved.length + '개';
+            if (!saved.length) renderItems();
+          }));
         });
         fl.append(tid, del);
-        tb.appendChild(fl);
-        const pickB = iconBtn(ICON.compass, '', () => {
-          const it = savedOf(s.id);
-          if (!it) return;
-          it.pick = !it.pick;
-          saveList();
-          paintPick();
-          toast(it.pick ? '둘러보기에 포함' : '둘러보기에서 제외');
-        });
-        const paintPick = () => {
-          const on = !!(savedOf(s.id) || {}).pick;
-          pickB.classList.toggle('on', on);
-          pickB.title = on ? '둘러보기에서 제외' : '둘러보기에 포함';
-          pickB.setAttribute('aria-label', pickB.title);
-        };
-        paintPick();
-        const acts = el('div', 'acts');
-        acts.append(iconBtn(ICON.edit, '일지 수정', () => openBm(s.id, 'hist')), pickB);
+        tb.appendChild(fl);        const acts = el('div', 'acts');
+        acts.append(iconBtn(ICON.edit, '일지 수정', () => openBm(s.id, 'hist')));
         row.append(tb, foot, acts);
         box.appendChild(row);
       });
     }
 
+    // 카드 위에 "삭제할까요?" 확인을 띄운다
+    function askCardDelete(tb, msg, onYes) {
+      if (tb.querySelector('.cdel')) return;
+      const ov = el('div', 'cdel');
+      ov.addEventListener('click', e => e.stopPropagation());
+      const q = el('div', 'cq', msg);
+      const r = el('div', 'cbtns');
+      const no = el('button', 'cb', '취소');
+      const yes = el('button', 'cb yes', '삭제');
+      no.type = yes.type = 'button';
+      no.addEventListener('click', e => {
+        e.stopPropagation();
+        ov.classList.add('out');
+        setTimeout(() => ov.remove(), 180);
+      });
+      yes.addEventListener('click', e => {
+        e.stopPropagation();
+        yes.disabled = no.disabled = true;
+        onYes();
+      });
+      r.append(no, yes);
+      ov.append(q, r);
+      tb.appendChild(ov);
+    }
+
+    // 카드를 줄이며 지운 뒤, 나머지 카드는 원래 자리에서 새 자리로 미끄러지게 옮긴다
+    function removeCard(row, apply) {
+      const box = row.parentElement;
+      if (!box) { apply(); return; }
+      const sibs = Array.from(box.children).filter(c => c !== row);
+      const first = new Map(sibs.map(c => [c, c.getBoundingClientRect()]));
+      const finish = () => {
+        const h0 = panel.offsetHeight;
+        row.remove();
+        apply();
+        sibs.forEach(c => {
+          if (!c.isConnected || !c.animate) return;
+          const f = first.get(c), l = c.getBoundingClientRect();
+          const dx = f.left - l.left, dy = f.top - l.top;
+          if (!dx && !dy) return;
+          c.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+            { duration: 420, easing: SWAP_EASE });
+        });
+        if (!panel.classList.contains('hist')) growFrom(h0);
+      };
+      if (!row.animate) { finish(); return; }
+      row.style.pointerEvents = 'none';
+      const a = row.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.82)' }],
+        { duration: 220, easing: 'ease-in', fill: 'forwards' });
+      a.onfinish = finish;
+    }
     function renderHistItems() {
       const box = panel.querySelector('#hitems');
       if (!box) return;
@@ -3384,9 +3195,11 @@
         del.title = '기록 삭제';
         del.addEventListener('click', e => {
           e.stopPropagation();
-          watched = watched.filter(x => x.id !== w.id);
-          saveWatched();
-          renderHistItems();
+          askCardDelete(tb, '기록을 삭제할까요?', () => removeCard(row, () => {
+            watched = watched.filter(x => x.id !== w.id);
+            saveWatched();
+            if (!watched.length) renderHistItems();
+          }));
         });
         tb.appendChild(del);
 
@@ -3425,7 +3238,6 @@
       }
       const title = (it && it.title) || pageT || dates[bmId] || '';
       let stars = (it && it.stars) || 0;
-      let pick = !!(it && it.pick);
 
       panel.appendChild(el('div', 'lbl', it ? '일지 수정' : '일지 작성'));
       panel.appendChild(el('div', 'bmt', bmId + (title ? '  ·  ' + title : '')));
@@ -3457,18 +3269,13 @@
       paint();
       panel.appendChild(row);
 
-      const pt = el('div', 'tog inl' + (pick ? ' on' : ''), '둘러보기에 포함');
-      pt.setAttribute('role', 'switch');
-      pt.title = '별점과 상관없이 이 작품의 작가를 둘러보기에 넣습니다';
-      pt.addEventListener('click', () => { pick = !pick; pt.classList.toggle('on', pick); });
-      panel.appendChild(pt);
 
       const save = () => {
         const alias = inp.value.trim();
         const arts = isCur ? pageArtists(bmId) : null;
         const was = isSaved(bmId);
-        if (was) updateSaved(bmId, alias, stars, arts, pick);
-        else addSaved(bmId, title, alias, stars, arts, pick);
+        if (was) updateSaved(bmId, alias, stars, arts);
+        else addSaved(bmId, title, alias, stars, arts);
         updateCounts();
         toast(was ? '일지 수정됨' : (alias ? '일지 작성: ' + alias : '일지에 기록했습니다'));
         backFromBm();
@@ -3489,7 +3296,7 @@
         }));
       }
       panel.appendChild(r2);
-      panel.appendChild(el('div', 'hint', '별명을 적으면 제목 대신 그 별명이 보입니다. 별점은 일지 목록에 ★로 표시되고, 둘러보기 기준으로도 쓰입니다.'));
+      panel.appendChild(el('div', 'hint', '별명을 적으면 제목 대신 그 별명이 보입니다. 별점은 일지 목록에 ★로 표시됩니다.'));
     }
 
     function importList() {
@@ -3506,7 +3313,6 @@
               id, title: (o && o.title) || '', alias: (o && o.alias) || '',
               stars: Math.max(0, Math.min(5, Math.round(+(o && o.stars) || 0))),
               arts: Array.isArray(o && o.arts) ? o.arts.slice(0, 16) : [],
-              pick: !!(o && o.pick),
               ts: (o && o.ts) || Date.now()
             });
             added++;
@@ -3529,156 +3335,12 @@
       const list = el('div', 'slist');
       const cur = currentSort();
       SORTS.forEach(([key, url]) => {
-        const b = el('button', 'srow' + (key === cur && !feed ? ' on' : ''), SORT_KR[key] || key);
+        const b = el('button', 'srow' + (key === cur ? ' on' : ''), SORT_KR[key] || key);
         b.type = 'button';
-        b.addEventListener('click', () => { stopFeed(); location.href = url; });
+        b.addEventListener('click', () => { location.href = url; });
         list.appendChild(b);
       });
-      const bb = el('button', 'srow' + (feed ? ' on' : ''), '둘러보기');
-      bb.type = 'button';
-      bb.addEventListener('click', () => setPanel('browse'));
-      list.appendChild(bb);
       panel.appendChild(list);
-    }
-
-    let browseSeq = 0;
-    let lastArts = null, feedBusy = false;
-
-    async function runFeed(b) {
-      if (feedBusy) return;
-      if (!inf) { toast('설정에서 Unlimited scroll 을 켜야 쓸 수 있습니다'); return; }
-      const arts = lastArts;
-      if (!arts || !arts.length) { toast('작가 목록을 먼저 불러오는 중입니다'); return; }
-      feedBusy = true;
-      const names = arts.map(a => a.name).slice(0, 40);
-      hlog('모아보기 시작 · 작가', names.length + '명');
-      let done = 0, ok = 0;
-      const all = new Set();
-      b.textContent = '목록 받는 중… 0 / ' + names.length;
-      await poolMap(names, 3, async n => {
-        const ids = await artistNozomi(n);
-        if (ids && ids.length) { ok++; ids.forEach(x => all.add(x)); }
-        done++;
-        if (b.isConnected) b.textContent = '목록 받는 중… ' + done + ' / ' + names.length;
-      });
-      feedBusy = false;
-      const ids = Array.from(all).filter(x => x > 0).sort((x, y) => y - x);
-      hlog('모아보기 합계 · 작가', ok + '/' + names.length, '· 작품', ids.length + '개');
-      if (!ids.length) {
-        if (b.isConnected) b.textContent = '작가 작품 모아보기';
-        toast('작품 목록을 받지 못했습니다 · 진단 로그를 확인해 주세요');
-        return;
-      }
-      startFeed(ids, names);
-      const fl = $('#filt .fl');
-      if (fl) fl.textContent = '둘러보기';
-      setPanel(null, true);
-      toast('작가 ' + ok + '명 · 작품 ' + ids.length + '개');
-    }
-
-    function renderBrowse() {
-      panel.textContent = '';
-      const top = el('div', 'row');
-      top.appendChild(btn('← 정렬', 'sm', () => setPanel('sort')));
-      if (feed) {
-        top.appendChild(btn('모아보기 끄기', 'sm', () => { stopFeed(); location.reload(); }));
-      } else {
-        const fb = btn('작가 작품 모아보기', 'primary sm', () => runFeed(fb));
-        fb.title = '아래 작가들의 작품을 합쳐서 홈 목록 자리에 최신순으로 보여줍니다';
-        top.appendChild(fb);
-      }
-      panel.appendChild(top);
-
-      panel.appendChild(el('div', 'lbl', '둘러보기 기준'));
-      const min = +settings.browseMin || 0;
-      const row = el('div', 'stars');
-      for (let i = 1; i <= 5; i++) {
-        const b = el('button', 'starb' + (i <= min ? ' on' : ''));
-        b.innerHTML = starSvg(false);
-        b.type = 'button';
-        b.title = i + '점 이상';
-        b.addEventListener('click', () => {
-          settings.browseMin = (settings.browseMin === i ? 0 : i);
-          saveSettings();
-          fadeSwap(Array.from(panel.children), () => {
-            renderBrowse();
-            return Array.from(panel.children);
-          });
-        });
-        row.appendChild(b);
-      }
-      panel.appendChild(row);
-      const picks = saved.filter(s => s.pick).length;
-      const byStar = min ? saved.filter(s => !s.pick && (+s.stars || 0) >= min).length : 0;
-      panel.appendChild(el('div', 'hint',
-        (min ? '별점 ' + min + '점 이상 일지 ' + byStar + '개' : '별점 기준 없음') +
-        ' + 직접 고른 일지 ' + picks + '개의 작가입니다. 카드를 누르면 그 작가 작품을 검색합니다. ' +
-        '직접 고르기는 일지 목록의 나침반 버튼이나 일지 작성 화면에서 할 수 있습니다.'));
-
-      const box = el('div', 'list');
-      box.id = 'agrid';
-      box.style.marginTop = '12px';
-      panel.appendChild(box);
-      fillBrowse(box);
-    }
-
-    async function fillBrowse(box) {
-      const list = browseList();
-      if (!list.length) {
-        box.appendChild(el('div', 'empty', saved.length ? '기준에 맞는 일지가 없습니다' : '작성한 일지가 없습니다'));
-        return;
-      }
-      const my = ++browseSeq;
-      const need = Math.min(80, list.filter(s => !hasArts(s)).length);
-      let st = null;
-      if (need) {
-        st = el('div', 'empty', '일지 작가 정보 확인 중… 0 / ' + need);
-        box.appendChild(st);
-      }
-      const arts = await collectArtists(list, (d, t) => {
-        if (st) st.textContent = '일지 작가 정보 확인 중… ' + d + ' / ' + t;
-      });
-      if (my !== browseSeq || panelMode !== 'browse' || !box.isConnected) return;
-      lastArts = arts;
-      growRender(() => {
-        box.textContent = '';
-        if (!arts.length) {
-          box.appendChild(el('div', 'empty', '일지 작품에서 작가를 찾지 못했습니다'));
-          return;
-        }
-        arts.forEach(a => box.appendChild(artistCard(a)));
-      });
-      fadeIn(Array.from(box.children));
-    }
-
-    function artistCard(a) {
-      const card = document.createElement('a');
-      card.className = 'item acard';
-      const q = 'artist:' + a.name.toLowerCase().replace(/\s+/g, '_') + ' language:' + LANG;
-      card.href = '/search.html?query=' + encodeURIComponent(q);
-      card.title = a.name + ' 작품 검색';
-      const tb = el('div', 'tb');
-      const tid = a.ids.find(i => thumbs[i]);
-      if (tid) {
-        const im = document.createElement('img');
-        im.alt = '';
-        im.addEventListener('error', () => { im.remove(); tb.insertBefore(el('span', '', '이미지 없음'), tb.firstChild); });
-        im.addEventListener('load', () => im.classList.add('ld'));
-        tb.appendChild(im);
-        queueThumb(im, thumbs[tid]);
-      } else tb.appendChild(el('span', '', '이미지 없음'));
-      const fl = el('div', 'tfl');
-      fl.appendChild(el('span', 'tid', a.name));
-      tb.appendChild(fl);
-      const info = el('div', 'info');
-      const dt = el('div', 'dt');
-      if (a.stars) dt.appendChild(starsEl(a.stars));
-      dt.appendChild(el('div', 'dd', '일지 ' + a.ids.length + '개'));
-      info.appendChild(dt);
-      const foot = el('div', 'foot');
-      foot.appendChild(info);
-      card.append(tb, foot);
-      return card;
     }
 
     function renderSettings() {
@@ -3745,7 +3407,7 @@
           ['제목 아래 날짜', '작품의 게시일자를 작고 흐리게 보여줍니다.'],
           ['오른쪽 아래 ⋯', '작품의 태그와 작가를 팝업으로 보여줍니다.'],
           ['×N 뱃지', '제목이 같은 작품이 여러 개 묶여 있다는 뜻입니다. 누르면 목록이 펼쳐집니다.'],
-          ['정렬 필터', '목록 정렬 방식을 바꿉니다. 둘러보기를 고르면 기준 별점 이상이거나 직접 고른 일지의 작가가 카드로 나오고, 카드를 누르면 그 작가 작품을 검색합니다.'],
+          ['정렬 필터', '목록 정렬 방식을 바꿉니다.'],
           ['하단 알약', '품번 복사, 일지 작성, 검색, 최근·일지 목록, 설정을 엽니다.']
         ]],
         ['리더', [
@@ -3969,7 +3631,7 @@
 
     const btnFor = {
       search: '#searchBtn', hist: '#histBtn', set: '#setBtn', block: '#setBtn', log: '#setBtn',
-      info: '#infoBtn', sort: '#filt', browse: '#filt', bm: '#star', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn'
+      info: '#infoBtn', sort: '#filt', bm: '#star', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn'
     };
     // ⋯ 상세정보: 작품 카드 바로 아래(공간이 없으면 위)에 붙어서 뜨는 팝업
     const cpop = $('#cpop');
@@ -4078,7 +3740,7 @@
     }
     const RENDERERS = {
       search: renderSearch, hist: renderHist, set: renderSettings, block: renderBlock,
-      log: renderLog, info: renderInfo, sort: renderSort, browse: renderBrowse, bm: renderBm,
+      log: renderLog, info: renderInfo, sort: renderSort, bm: renderBm,
       preview: renderPreview, home: renderHomeChoice, confirm: renderConfirm, help: renderHelp
     };
 
@@ -5287,7 +4949,6 @@
     rewriteLinks(document);
     filterGalleries(document);
     if (settings.cardStyle) restyleCards(document);
-    applyBrowseFilter();
     if (settings.mergeTitles) mergeDuplicates();
     initInfinite();
     warmPages();
@@ -5297,10 +4958,13 @@
     if (window.__hkEdges) window.__hkEdges();
   }
 
-  const isOursNode = n => !!(n && n.nodeType === 1 && n.closest && n.closest('#hk-host, #hk-fx-ov, #hk-cover, .hk-zoom, .hk-wrap'));
+  const OURS_SEL = '#hk-host, #hk-fx-ov, #hk-cover, #hk-sentinel, #hk-bg, #hk-empty, .hk-zoom, .hk-wrap, .hk-card-host';
+  const isOursNode = n => !!(n && n.nodeType === 1 && n.closest && n.closest(OURS_SEL));
   const observer = new MutationObserver(muts => {
     if (runT) return;
-    if (muts.every(m => isOursNode(m.target) && [...m.addedNodes, ...m.removedNodes].every(isOursNode))) return;
+    // 이 스크립트가 만든 노드(카드 껍데기, 상태 문구 등)만 바뀐 경우는 다시 돌지 않는다
+    const ours = (n, m) => isOursNode(n) || (n.nodeType !== 1 && isOursNode(m.target));
+    if (muts.every(m => [...m.addedNodes, ...m.removedNodes].every(n => ours(n, m)))) return;
     if (muts.some(m => !isOursNode(m.target) && !(m.target.closest && m.target.closest('.gallery-content')))) nativeDirty = true;
     runT = setTimeout(() => {
       runT = 0;
