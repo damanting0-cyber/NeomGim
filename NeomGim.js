@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.3.2
+// @version      1.4.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.3.2';
+  const VERSION = '1.4.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -288,7 +288,7 @@
 
   const SITE_CSS = `
     ${LIST_BG_CSS}
-    html.hk-restoring body { opacity: 0 !important; }
+    html.hk-restoring body, html.hk-boot body { opacity: 0 !important; }
     .hk-slot { flex: 0 0 100%; width: 100%; grid-column: 1 / -1; pointer-events: none; }
     body { transition: opacity .2s ease; }
     .hk-banner, .hk-native { display: none !important; }
@@ -321,6 +321,17 @@
       transition: opacity .4s ease;
     }
     .gallery-content > div[data-hk-done].hk-img-ok::before { opacity: 0; }
+    .gallery-content > div:not([data-hk-done]):not(.hk-slot) {
+      position: relative !important; aspect-ratio: 3 / 4; overflow: hidden !important; border-radius: 18px;
+    }
+    .gallery-content > div:not([data-hk-done]):not(.hk-slot) > * { visibility: hidden !important; }
+    .gallery-content > div:not([data-hk-done]):not(.hk-slot)::before {
+      content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 0;
+      border-radius: 18px; pointer-events: none; background-color: #1e1e22;
+      background-image: linear-gradient(to top, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0));
+      background-repeat: no-repeat; background-size: 100% 60%;
+      animation: hkLoad 1.6s ease-in-out infinite;
+    }
     @keyframes hkLoad { from { background-position: 0 120%; } to { background-position: 0 -40%; } }
     .gallery-content > div[data-hk-done] {
       position: relative !important;
@@ -747,8 +758,8 @@
     .jbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
     .jbar .jn { color: var(--sub); font-size: 11.5px; font-weight: 600; padding-left: 4px; }
     .tfl {
-      position: absolute; left: 6px; right: 6px; bottom: 6px; z-index: 2;
-      display: flex; align-items: center; gap: 4px; height: 28px; padding: 0 3px 0 10px;
+      position: absolute; left: 3px; right: 3px; bottom: 3px; z-index: 2;
+      display: flex; align-items: center; gap: 4px; height: 34px; padding: 0 3px 0 11px;
       border-radius: 999px; background: rgba(20, 20, 26, 0.5);
       -webkit-backdrop-filter: blur(10px) saturate(130%); backdrop-filter: blur(10px) saturate(130%);
       border: 1px solid rgba(255, 255, 255, 0.24); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
@@ -756,18 +767,25 @@
     }
     .tfl .tid {
       flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      color: #fff; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: left;
+      color: #fff; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: left;
     }
     .tfl .tx {
       -webkit-appearance: none; appearance: none; flex: none; border: 0; padding: 0; cursor: pointer;
-      width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.14);
-      color: #fff; font-size: 11px; line-height: 22px; text-align: center; transition: background .2s ease, transform .3s var(--ease);
+      width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, 0.14);
+      color: #fff; font-size: 12px; line-height: 28px; text-align: center; transition: background .2s ease, transform .3s var(--ease);
     }
     .tfl .tx:active { background: rgba(255, 90, 90, 0.85); transform: scale(.86); }
     .ibs.on { color: #ffd54a; background: rgba(255, 213, 74, 0.16); border-color: rgba(255, 213, 74, 0.45); }
     .tog.inl { min-height: 40px; margin-top: 10px; }
+    .panel.cpop {
+      position: fixed; left: 0; top: 0; z-index: 3; width: 300px;
+      padding: 14px; border-radius: 22px; max-height: 60vh;
+      background: rgba(24, 24, 28, 0.82) !important;
+    }
+    .cpop .ttl { font-size: 14.5px; margin-bottom: 2px; }
+    .cpop .lbl { margin-top: 10px; }
     .acard { text-decoration: none; color: inherit; cursor: pointer; }
-    .acard .tfl { padding-right: 10px; }
+    .acard .tfl { padding-right: 11px; }
     .fabwrap { display: flex; justify-content: flex-end; margin-top: 14px; }
     .helpfab {
       -webkit-appearance: none; appearance: none; flex: none; cursor: pointer;
@@ -1444,7 +1462,7 @@
     dots.addEventListener('click', e => {
       e.preventDefault();
       e.stopPropagation();
-      if (openCardMeta) openCardMeta({ id, title, meta: meta || { artists: [], groups: [], tags: [] } });
+      if (openCardMeta) openCardMeta({ id, title, meta: meta || { artists: [], groups: [], tags: [] } }, cardHost);
     });
 
     const grp = sh.querySelector('.grp'), grpList = sh.querySelector('.grplist');
@@ -1614,21 +1632,180 @@
     return info;
   }
 
-  let browseArtists = null; // Map(lowerName -> displayName)
+  // ── 둘러보기 모아보기: 일지 작가들의 작품 품번을 합쳐서 홈 목록 대신 보여준다 ──
+  const FEED_SS = 'hk_feed';
+  const FEED_PER = 25;
+  let feed = null; // { ids: number[], pos: 불러온 개수, names: string[] }
 
-  function cardArtists(card) {
-    return readCardMeta(card).artists.map(normArtName);
+  function writeFeed() {
+    try {
+      if (feed) sessionStorage.setItem(FEED_SS, JSON.stringify(feed));
+      else sessionStorage.removeItem(FEED_SS);
+    } catch (e) {}
+  }
+  if (currentSort() && settings.infinite) {
+    try {
+      const o = JSON.parse(sessionStorage.getItem(FEED_SS) || 'null');
+      if (o && Array.isArray(o.ids) && o.ids.length) feed = { ids: o.ids, pos: +o.pos || 0, names: o.names || [] };
+    } catch (e) {}
   }
 
+  // 모아보기 중에는 원래 홈 카드를 숨긴다
   function applyBrowseFilter() {
-    if (!browseArtists) {
-      document.querySelectorAll('.gallery-content > div.hk-artsoff').forEach(c => c.classList.remove('hk-artsoff'));
+    document.querySelectorAll('.gallery-content > div').forEach(card => {
+      card.classList.toggle('hk-artsoff', !!feed && !card.dataset.hkFeed && !card.classList.contains('hk-slot'));
+    });
+  }
+
+  function gmGetBuf(url) {
+    return new Promise((res, rej) => {
+      if (typeof GM_xmlhttpRequest !== 'function') { rej(new Error('no gm')); return; }
+      GM_xmlhttpRequest({
+        method: 'GET', url, responseType: 'arraybuffer', timeout: 10000,
+        ontimeout: () => rej(new Error('timeout')),
+        onload: r => (r.status >= 200 && r.status < 300 && r.response ? res(r.response) : rej(new Error('HTTP ' + r.status))),
+        onerror: () => rej(new Error('network'))
+      });
+    });
+  }
+
+  function getBuf(url) {
+    return fetchT(url, { credentials: 'omit' }, 10000)
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+      .catch(err => {
+        const msg = String(err && err.message || err);
+        if (/HTTP 404/.test(msg)) throw err;
+        return gmGetBuf(url);
+      });
+  }
+
+  function poolMap(arr, n, fn) {
+    const out = new Array(arr.length);
+    let i = 0;
+    const run = async () => {
+      while (i < arr.length) {
+        const k = i++;
+        try { out[k] = await fn(arr[k], k); } catch (e) { out[k] = null; }
+      }
+    };
+    return Promise.all(Array.from({ length: Math.min(n, arr.length) }, run)).then(() => out);
+  }
+
+  // 작가 한 명의 한국어 작품 품번 목록 (.nozomi: 4바이트 빅엔디언 정수 배열)
+  async function artistNozomi(name) {
+    const low = String(name || '').toLowerCase().trim();
+    const variants = Array.from(new Set([low, low.replace(/\s+/g, '_')]));
+    for (const v of variants) {
+      for (const pre of ['n/artist/', 'artist/']) {
+        const url = 'https://ltn.hitomi.la/' + pre + encodeURIComponent(v) + '-' + LANG + '.nozomi';
+        try {
+          const buf = await getBuf(url);
+          const dv = new DataView(buf);
+          const out = [];
+          for (let i = 0; i + 4 <= buf.byteLength; i += 4) out.push(dv.getInt32(i, false));
+          hlog('모아보기: 목록', name, '→', out.length + '개', '(' + pre + v + ')');
+          return out;
+        } catch (e) {
+          hlog('모아보기: 목록 실패', url, String(e && e.message || e));
+        }
+      }
+    }
+    return null;
+  }
+
+  let tnWarned = false;
+  async function fetchBlock(id) {
+    const url = 'https://ltn.hitomi.la/galleryblock/' + id + '.html';
+    let html = '';
+    try {
+      const r = await fetchT(url, { credentials: 'omit' }, 10000);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      html = await r.text();
+    } catch (e) {
+      try { html = await gmGet(url); } catch (e2) {
+        hlog('모아보기: 카드 실패', id, String(e && e.message || e), '/', String(e2 && e2.message || e2));
+        return null;
+      }
+    }
+    try {
+      const w = W();
+      if (typeof w.rewrite_tn_paths === 'function') html = w.rewrite_tn_paths(html);
+      else if (!tnWarned) { tnWarned = true; hlog('모아보기: rewrite_tn_paths 없음 (썸네일 주소 변환 생략)'); }
+    } catch (e) { hlog('모아보기: 썸네일 주소 변환 오류', String(e && e.message || e)); }
+    const tpl = document.createElement('template');
+    tpl.innerHTML = String(html || '').trim();
+    let card = tpl.content.firstElementChild;
+    if (!card) { hlog('모아보기: 카드 HTML 비어 있음', id); return null; }
+    if (card.tagName !== 'DIV') {
+      const d = document.createElement('div');
+      d.appendChild(card);
+      card = d;
+    }
+    if (!card.querySelector('img')) hlog('모아보기: 카드에 이미지 없음', id);
+    if (!Array.from(card.querySelectorAll('a[href]')).some(a => ID_RE.test(a.getAttribute('href')))) {
+      hlog('모아보기: 카드 링크 형식 다름', id, (card.querySelector('a[href]') || {}).outerHTML ? card.querySelector('a[href]').getAttribute('href') : '(링크 없음)');
+    }
+    card.dataset.krChecked = '1';
+    card.dataset.hkFeed = '1';
+    return card;
+  }
+
+  async function feedLoad() {
+    inf.loading = true;
+    inf.stopped = false;
+    setStatus('불러오는 중…');
+    const start = feed.pos;
+    const slice = feed.ids.slice(start, start + FEED_PER);
+    if (!slice.length) {
+      inf.loading = false;
+      inf.stopped = true;
+      inf.restore = 0;
+      setStatus('마지막 작품입니다');
       return;
     }
-    document.querySelectorAll('.gallery-content > div').forEach(card => {
-      const hit = cardArtists(card).some(a => browseArtists.has(a));
-      card.classList.toggle('hk-artsoff', !hit);
+    const cards = await poolMap(slice, 4, fetchBlock);
+    if (!feed) { inf.loading = false; return; }
+    const page = Math.floor(start / FEED_PER) + 1;
+    let added = 0;
+    cards.forEach(c => {
+      if (!c) return;
+      c.dataset.hkPage = String(page);
+      inf.gc.appendChild(c);
+      added++;
     });
+    inf.loading = false;
+    hlog('모아보기: 카드', added + ' / ' + slice.length, '(' + (start + slice.length) + ' / ' + feed.ids.length + ')');
+    if (!added) {
+      inf.stopped = true;
+      inf.restore = 0;
+      setStatus('불러오지 못했습니다 · 눌러서 다시 시도');
+      return;
+    }
+    feed.pos = start + slice.length;
+    writeFeed();
+    loadedPages = page;
+    setStatus('');
+    if (inf.restore && feed.pos < inf.restore) setTimeout(loadNext, 0);
+    else { inf.restore = 0; kickInfinite(); }
+  }
+
+  function startFeed(ids, names) {
+    feed = { ids, pos: 0, names };
+    writeFeed();
+    document.querySelectorAll('.gallery-content > div[data-hk-feed]').forEach(c => c.remove());
+    applyBrowseFilter();
+    window.scrollTo(0, 0);
+    if (inf) {
+      inf.pre = null;
+      inf.restore = 0;
+      inf.stopped = false;
+      loadNext();
+    }
+  }
+
+  function stopFeed() {
+    feed = null;
+    writeFeed();
   }
 
   function fetchGalleryArtists(gid) {
@@ -1779,13 +1956,14 @@
   }
 
   function prefetchNext() {
-    if (!inf || inf.stopped || inf.pre || slotMode) return;
+    if (!inf || inf.stopped || inf.pre || slotMode || feed) return;
     const n = inf.page + 1;
     inf.pre = { n, p: fetchCards(pageUrl(n), inf.perPage).catch(() => null) };
   }
 
   async function loadNext() {
     if (!inf || inf.loading) return;
+    if (feed) return feedLoad();
     inf.loading = true;
     inf.stopped = false;
     setStatus('불러오는 중…');
@@ -1858,6 +2036,14 @@
     }
 
     Array.from(gc.children).forEach(c => { if (!c.dataset.hkPage) c.dataset.hkPage = '1'; });
+    if (feed) {
+      // 모아보기 복원: 뒤로 왔으면 전에 불러온 만큼 다시 받고, 아니면 처음부터
+      const want = scrollTarget != null ? feed.pos : 0;
+      feed.pos = 0;
+      inf.restore = want;
+      loadNext();
+      return;
+    }
     prefetchNext();
 
     let want = 0;
@@ -2359,7 +2545,7 @@
   }
 
   function popClose(e, g, after) {
-    if (!e.classList.contains('open')) return;
+    if (!e.classList.contains('open') || e.classList.contains('out')) return;
     e.classList.add('out');
     clearTimeout(e._t);
     clearAnims([e, g]);
@@ -2506,6 +2692,7 @@
         <div class="scrim" id="scrim"></div>
         <div class="glass" id="glass"></div>
         ${IS_WORK_PAGE ? '' : '<div class="fxtop"></div><div class="fxbot"></div>'}
+        <div class="cpop panel pill" id="cpop"></div>
         <div class="wrap" id="wrap">
           <div class="stack">
             <div class="toast pill" id="toast"></div>
@@ -2519,7 +2706,7 @@
           <div class="bottom">
             ${curSort ? `
             <button class="filt pill" type="button" id="filt" title="정렬 바꾸기">
-              ${ICON.sort}<span class="fl">${SORT_KR[curSort] || ''}</span>
+              ${ICON.sort}<span class="fl">${feed ? '둘러보기' : (SORT_KR[curSort] || '')}</span>
             </button>` : ''}
             <div class="bar pill" id="bar">
               ${curId ? `
@@ -3342,12 +3529,12 @@
       const list = el('div', 'slist');
       const cur = currentSort();
       SORTS.forEach(([key, url]) => {
-        const b = el('button', 'srow' + (key === cur ? ' on' : ''), SORT_KR[key] || key);
+        const b = el('button', 'srow' + (key === cur && !feed ? ' on' : ''), SORT_KR[key] || key);
         b.type = 'button';
-        b.addEventListener('click', () => { location.href = url; });
+        b.addEventListener('click', () => { stopFeed(); location.href = url; });
         list.appendChild(b);
       });
-      const bb = el('button', 'srow', '둘러보기');
+      const bb = el('button', 'srow' + (feed ? ' on' : ''), '둘러보기');
       bb.type = 'button';
       bb.addEventListener('click', () => setPanel('browse'));
       list.appendChild(bb);
@@ -3355,11 +3542,51 @@
     }
 
     let browseSeq = 0;
+    let lastArts = null, feedBusy = false;
+
+    async function runFeed(b) {
+      if (feedBusy) return;
+      if (!inf) { toast('설정에서 Unlimited scroll 을 켜야 쓸 수 있습니다'); return; }
+      const arts = lastArts;
+      if (!arts || !arts.length) { toast('작가 목록을 먼저 불러오는 중입니다'); return; }
+      feedBusy = true;
+      const names = arts.map(a => a.name).slice(0, 40);
+      hlog('모아보기 시작 · 작가', names.length + '명');
+      let done = 0, ok = 0;
+      const all = new Set();
+      b.textContent = '목록 받는 중… 0 / ' + names.length;
+      await poolMap(names, 3, async n => {
+        const ids = await artistNozomi(n);
+        if (ids && ids.length) { ok++; ids.forEach(x => all.add(x)); }
+        done++;
+        if (b.isConnected) b.textContent = '목록 받는 중… ' + done + ' / ' + names.length;
+      });
+      feedBusy = false;
+      const ids = Array.from(all).filter(x => x > 0).sort((x, y) => y - x);
+      hlog('모아보기 합계 · 작가', ok + '/' + names.length, '· 작품', ids.length + '개');
+      if (!ids.length) {
+        if (b.isConnected) b.textContent = '작가 작품 모아보기';
+        toast('작품 목록을 받지 못했습니다 · 진단 로그를 확인해 주세요');
+        return;
+      }
+      startFeed(ids, names);
+      const fl = $('#filt .fl');
+      if (fl) fl.textContent = '둘러보기';
+      setPanel(null, true);
+      toast('작가 ' + ok + '명 · 작품 ' + ids.length + '개');
+    }
 
     function renderBrowse() {
       panel.textContent = '';
       const top = el('div', 'row');
       top.appendChild(btn('← 정렬', 'sm', () => setPanel('sort')));
+      if (feed) {
+        top.appendChild(btn('모아보기 끄기', 'sm', () => { stopFeed(); location.reload(); }));
+      } else {
+        const fb = btn('작가 작품 모아보기', 'primary sm', () => runFeed(fb));
+        fb.title = '아래 작가들의 작품을 합쳐서 홈 목록 자리에 최신순으로 보여줍니다';
+        top.appendChild(fb);
+      }
       panel.appendChild(top);
 
       panel.appendChild(el('div', 'lbl', '둘러보기 기준'));
@@ -3412,6 +3639,7 @@
         if (st) st.textContent = '일지 작가 정보 확인 중… ' + d + ' / ' + t;
       });
       if (my !== browseSeq || panelMode !== 'browse' || !box.isConnected) return;
+      lastArts = arts;
       growRender(() => {
         box.textContent = '';
         if (!arts.length) {
@@ -3743,32 +3971,94 @@
       search: '#searchBtn', hist: '#histBtn', set: '#setBtn', block: '#setBtn', log: '#setBtn',
       info: '#infoBtn', sort: '#filt', browse: '#filt', bm: '#star', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn'
     };
-    let metaCard = null;
-    openCardMeta = o => {
-      const same = panelMode === 'meta' && metaCard && metaCard.id === o.id;
+    // ⋯ 상세정보: 작품 카드 바로 아래(공간이 없으면 위)에 붙어서 뜨는 팝업
+    const cpop = $('#cpop');
+    let metaCard = null, metaHost = null, metaRaf = 0;
+    const metaOpen = () => cpop.classList.contains('open') && !cpop.classList.contains('out');
+    window.__hkMetaOpen = metaOpen;
+
+    function placeMeta() {
+      metaRaf = 0;
+      if (!metaHost || !cpop.classList.contains('open')) return;
+      if (!metaHost.isConnected) { closeMeta(); return; }
+      const r = metaHost.getBoundingClientRect();
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const w = Math.min(Math.max(r.width + 40, 280), vw - 24);
+      cpop.style.width = w + 'px';
+      const left = Math.max(12, Math.min(vw - w - 12, r.left + r.width / 2 - w / 2));
+      const h = cpop.offsetHeight;
+      const below = vh - r.bottom - 12, above = r.top - 12;
+      const down = below >= h + 10 || below >= above;
+      const top = down ? r.bottom + 10 : r.top - 10 - h;
+      cpop.style.left = left + 'px';
+      cpop.style.top = Math.max(12, Math.min(vh - h - 12, top)) + 'px';
+      cpop.style.maxHeight = Math.max(160, (down ? below : above) - 10) + 'px';
+      cpop.style.transformOrigin = (r.left + r.width / 2 - left) + 'px ' + (down ? '0' : '100%');
+    }
+    const queuePlace = () => { if (!metaRaf && metaHost) metaRaf = requestAnimationFrame(placeMeta); };
+    window.addEventListener('scroll', queuePlace, { passive: true });
+    window.addEventListener('resize', queuePlace);
+
+    function closeMeta() {
+      metaHost = null;
+      popClose(cpop, null, () => { if (!metaHost) cpop.textContent = ''; });
+    }
+
+    openCardMeta = (o, hostEl) => {
+      if (metaOpen() && metaCard && metaCard.id === o.id) { closeMeta(); return; }
+      if (panelMode) setPanel(null, true);
+      const moving = metaOpen();
       metaCard = o;
-      if (same) { setPanel(null, true); return; }
-      setPanel('meta');
+      metaHost = hostEl || null;
+      if (moving) {
+        // 다른 카드로 옮길 때: 내용만 바꾸고 새 위치로 부드럽게 이동
+        const r0 = cpop.getBoundingClientRect();
+        renderMeta();
+        placeMeta();
+        const r1 = cpop.getBoundingClientRect();
+        if (cpop.animate) cpop.animate([
+          { transform: `translate(${r0.left - r1.left}px, ${r0.top - r1.top}px)`, opacity: .6 },
+          { transform: 'none', opacity: 1 }
+        ], { duration: 320, easing: SWAP_EASE });
+        fadeIn(Array.from(cpop.children));
+        return;
+      }
+      renderMeta();
+      cpop.classList.add('open');
+      placeMeta();
+      popOpen(cpop, null);
     };
 
+    document.addEventListener('click', e => {
+      if (!metaOpen()) return;
+      const path = e.composedPath();
+      if (path.includes(cpop)) return;
+      if (path.some(n => n && n.classList && n.classList.contains('dots'))) return;
+      if (path.includes(host)) { closeMeta(); return; }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeMeta();
+    }, true);
+
     function renderMeta() {
-      panel.textContent = '';
+      const box = cpop;
+      box.textContent = '';
+      box.scrollTop = 0;
       const o = metaCard;
       if (!o) return;
       const m = o.meta || { artists: [], groups: [], tags: [] };
-      panel.appendChild(el('div', 'lbl', '제목'));
-      panel.appendChild(el('div', 'ttl', settings.koreanTitle ? koreanTitle(o.title || '') : (o.title || '')));
+      box.appendChild(el('div', 'ttl', settings.koreanTitle ? koreanTitle(o.title || '') : (o.title || '')));
 
-      panel.appendChild(el('div', 'lbl', '작가'));
+      box.appendChild(el('div', 'lbl', '작가'));
       if (m.artists.length || m.groups.length) {
         const c = el('div', 'chips');
         m.artists.forEach(a => c.appendChild(chipLink(a, `/artist/${enc(a)}-${LANG}.html`, 'a')));
         m.groups.forEach(g => c.appendChild(chipLink(g + ' (그룹)', `/group/${enc(g)}-${LANG}.html`, 'a')));
-        panel.appendChild(c);
-      } else panel.appendChild(el('div', 'val', '정보 없음'));
+        box.appendChild(c);
+      } else box.appendChild(el('div', 'val', '정보 없음'));
 
-      panel.appendChild(el('div', 'lbl', '태그 (' + m.tags.length + ')'));
-      if (!m.tags.length) panel.appendChild(el('div', 'val', '태그 없음'));
+      box.appendChild(el('div', 'lbl', '태그 (' + m.tags.length + ')'));
+      if (!m.tags.length) box.appendChild(el('div', 'val', '태그 없음'));
       const tc = el('div', 'chips');
       m.tags.forEach(t => {
         const i = t.indexOf(':');
@@ -3778,17 +4068,15 @@
         const label = (ns === 'female' ? '♀ ' : ns === 'male' ? '♂ ' : '') + name;
         tc.appendChild(chipLink(label, `/tag/${enc(t)}-${LANG}.html`, cls));
       });
-      if (m.tags.length) panel.appendChild(tc);
+      if (m.tags.length) box.appendChild(tc);
 
       const r = el('div', 'row');
-      r.style.marginTop = '14px';
+      r.style.marginTop = '12px';
       const cp = btn('품번 ' + o.id, 'sm', () => copyText(o.id).then(() => toast('품번 복사됨')));
-      r.append(btn('작품 열기', 'primary sm', () => { setPanel(null, true); goTo(o.id); }), cp);
-      panel.appendChild(r);
+      r.append(btn('작품 열기', 'primary sm', () => { closeMeta(); goTo(o.id); }), cp);
+      box.appendChild(r);
     }
-
     const RENDERERS = {
-      meta: renderMeta,
       search: renderSearch, hist: renderHist, set: renderSettings, block: renderBlock,
       log: renderLog, info: renderInfo, sort: renderSort, browse: renderBrowse, bm: renderBm,
       preview: renderPreview, home: renderHomeChoice, confirm: renderConfirm, help: renderHelp
@@ -3811,23 +4099,20 @@
       if (mode) {
         const wasOpen = panel.classList.contains('open') && !panel.classList.contains('out');
         scrim.classList.add('on');
+        if (metaOpen()) closeMeta();
         if (prev && wasOpen) {
-          if ((prev === 'search') !== (mode === 'search')) {
-            // 위/아래 위치가 바뀌는 경우: 닫히는 동작 뒤에 새 위치에서 연다
-            popClose(panel, glass, () => { if (my === swapSeq) showPanel(mode); });
-          } else {
-            morphPanel(mode, my);
-          }
+          morphPanel(mode, my);
         } else {
           showPanel(mode);
         }
-      } else {
+      } else if (prev) {
+        // 닫히는 중에는 스크림을 바로 치워서, 그 사이 누른 버튼·카드가 그대로 동작하게 한다
+        scrim.classList.remove('on');
         popClose(panel, glass, () => {
           if (my !== swapSeq) return;
           resetPanelStyle();
           if (!panelMode) panel.textContent = '';
           panel.classList.remove('top', 'hist');
-          scrim.classList.remove('on');
           syncKeyboard();
         });
       }
@@ -3838,7 +4123,6 @@
       panel.scrollTop = 0;
       RENDERERS[mode]();
       panel.classList.toggle('mini', mode === 'home' || mode === 'confirm');
-      panel.classList.toggle('top', mode === 'search');
       panel.classList.toggle('hist', mode === 'hist');
       syncKeyboard();
     }
@@ -4157,6 +4441,7 @@
     const path = e.composedPath();
     const hostEl = path.find(n => n && n.classList && n.classList.contains('hk-card-host'));
     if (!hostEl || !hostEl.shadowRoot) return;
+    if (window.__hkMetaOpen && window.__hkMetaOpen()) return;
     if (path.some(n => n && n.classList && (n.classList.contains('grp') || n.classList.contains('grplist') || n.classList.contains('dots')))) return;
     const sh = hostEl.shadowRoot;
     const a = sh.querySelector('.thumb');
@@ -4973,6 +5258,12 @@
     return out.concat(imgs).join('\n');
   }
 
+  // 목록 페이지: 첫 정리(run)가 끝날 때까지 원래 히토미 화면을 숨겨서 겹쳐 보이지 않게 한다
+  function endBoot() { try { document.documentElement.classList.remove('hk-boot'); } catch (e) {} }
+  if (!IS_WORK_PAGE) {
+    onRoot(() => document.documentElement.classList.add('hk-boot'));
+    setTimeout(endBoot, 3000);
+  }
   injectSiteCss();
   injectFxCss();
   if (IS_READER) initReaderInput();
@@ -5059,6 +5350,7 @@
     run();
     [1200, 3000].forEach(ms => setTimeout(checkEmptySearch, ms));
     buildUI();
+    requestAnimationFrame(() => requestAnimationFrame(endBoot));
     if (IS_READER) initReaderPreload();
     else initPreload();
     recordWatch(false);
