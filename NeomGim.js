@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.3.0
+// @version      1.3.2
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.3.0';
+  const VERSION = '1.3.2';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -114,7 +114,8 @@
         button { all: initial; cursor: pointer; padding: 8px 14px; border-radius: 999px;
           background: rgba(28,28,32,.9); color: #f2f2f5; border: 1px solid rgba(255,255,255,.18);
           font: 600 12px/1.2 -apple-system, 'Malgun Gothic', sans-serif; opacity: .75; }
-        button:hover { opacity: 1; }
+        button { transition: opacity .2s ease, transform .3s cubic-bezier(.22,1,.36,1); }
+        button:active { opacity: 1; transform: scale(.92); transition-duration: .1s; }
       </style>
       <button>NeomGim 켜기</button>`;
     sh.querySelector('button').addEventListener('click', () => setEnabled(true));
@@ -332,8 +333,8 @@
       box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
     }
     .gallery-content > div[data-hk-done].hk-img-ok:active {
-      transform: scale(1.04);
-      transition: transform .3s cubic-bezier(.22, 1, .36, 1), box-shadow .3s ease;
+      transform: scale(.97);
+      transition: transform .12s ease-out, box-shadow .3s ease;
     }
     @media (max-width: 520px) {
       .gallery-content { gap: 30px 24px !important; padding: 0 14px !important; }
@@ -372,7 +373,6 @@
       color: #fff; background: rgba(20, 20, 26, 0.78); border: 1px solid rgba(255, 255, 255, 0.35);
       transition: background .25s ease, transform .2s ease;
     }
-    .grp:hover { background: rgba(40, 40, 52, 0.8); }
     .grp:active { transform: scale(.94); }
     .grplist {
       position: absolute; top: 38px; right: 8px; left: 8px; z-index: 4; max-height: 60%; overflow-y: auto;
@@ -385,7 +385,8 @@
       display: flex; justify-content: space-between; gap: 8px; padding: 7px 8px;
       border-radius: 10px; color: #fff; text-decoration: none;
     }
-    .grplist a:hover { background: rgba(255, 255, 255, 0.12); }
+    .grplist a { transition: background .2s ease, transform .3s cubic-bezier(.22, 1, .36, 1); }
+    .grplist a:active { background: rgba(255, 255, 255, 0.12); transform: scale(.97); transition-duration: .1s; }
     .grplist .d { color: rgba(255, 255, 255, 0.6); font-size: 10.5px; }
     .info {
       position: absolute; left: 0; right: 0; bottom: 0;
@@ -402,7 +403,6 @@
       color: #fff; font: 700 15px/1 -apple-system, 'Malgun Gothic', sans-serif;
       letter-spacing: .5px; transition: background .2s ease, transform .2s ease;
     }
-    .dots:hover { background: rgba(20, 20, 26, 0.92); }
     .dots:active { transform: scale(.9); }
     .title a {
       display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -410,7 +410,6 @@
       font-size: 13px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em;
       transition: color .25s ease;
     }
-    .title a:hover { color: #1f4fbf; }
     .dline { font-size: 10.5px; line-height: 1.3; color: rgba(0, 0, 0, 0.5); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dline:empty { display: none; }
     .card.viewed .dline { color: rgba(0, 0, 0, 0.62); }
@@ -554,7 +553,7 @@
     .filt {
       -webkit-appearance: none; appearance: none; border: 1px solid rgba(255, 255, 255, 0.26); flex: none; cursor: pointer;
       display: inline-flex; align-items: center; gap: 7px;
-      height: 44px; padding: 0 15px 0 13px; border-radius: 999px;
+      height: 52px; padding: 0 17px 0 15px; border-radius: 999px;
       color: var(--text); font: inherit; font-size: 12.5px; font-weight: 700;
       animation: hkBarIn .7s var(--ease) .12s backwards;
       transition: color .2s var(--ease);
@@ -601,6 +600,10 @@
       -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
       mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); scrollbar-color: rgba(255, 255, 255, .28) transparent;
     }
+    .panel.hist > .hbody.at-top {
+      -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 24px), transparent 100%);
+      mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 24px), transparent 100%);
+    }
     .panel.top {
       position: fixed; top: 12px; right: 16px; bottom: auto;
       width: min(440px, calc(100vw - 32px));
@@ -628,7 +631,6 @@
       box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
       transition: transform .22s var(--ease), background .22s var(--ease);
     }
-    .hfix:hover { background: rgba(40, 40, 46, 0.8); }
     .hfix:active { transform: scale(.92); }
     .fxtop, .fxbot { position: fixed; left: 0; right: 0; pointer-events: none; z-index: 0; transition: opacity .25s ease; }
     .fxtop { top: 0; height: 64px; background: linear-gradient(to bottom, rgba(17, 17, 17, 0.75), rgba(17, 17, 17, 0)); }
@@ -659,7 +661,9 @@
       padding: 11px 14px; border-radius: 14px; cursor: pointer; font-size: 14px;
       transition: background .2s var(--ease);
     }
-    .sg:hover, .sg.hl { background: rgba(255, 255, 255, 0.13); }
+    .sg.hl { background: rgba(255, 255, 255, 0.13); }
+    .sg { transition: background .2s var(--ease), transform .3s var(--ease); }
+    .sg:active { background: rgba(255, 255, 255, 0.13); transform: scale(.98); transition-duration: .1s; }
     .sg .t { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sg .t mark { background: none; color: #fff; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
     .sg .k { flex: none; color: var(--sub); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -673,9 +677,9 @@
     .sg .ty.a { color: #ffe0a8; }
     .sg .x {
       flex: none; width: 24px; height: 24px; border-radius: 50%; text-align: center;
-      line-height: 24px; color: var(--sub); transition: background .2s, color .2s;
+      line-height: 24px; color: var(--sub); transition: background .2s, color .2s, transform .3s var(--ease);
     }
-    .sg .x:hover { color: #fff; background: rgba(255, 255, 255, 0.14); }
+    .sg .x:active { color: #fff; background: rgba(255, 255, 255, 0.14); transform: scale(.88); }
 
     .slist { display: flex; flex-direction: column; gap: 4px; }
     .srow {
@@ -685,7 +689,8 @@
       font: inherit; font-size: 13.5px; font-weight: 500; text-align: left; cursor: pointer;
       transition: background .2s var(--ease), color .2s var(--ease);
     }
-    .srow:hover { background: rgba(255, 255, 255, 0.13); }
+    .srow { transition: background .2s var(--ease), color .2s var(--ease), transform .3s var(--ease); }
+    .srow:active { background: rgba(255, 255, 255, 0.13); transform: scale(.98); transition-duration: .1s; }
     .srow.on { background: rgba(255, 255, 255, 0.20); color: #fff; font-weight: 700; }
     .srow.on::after { content: '✓'; font-size: 12px; margin-left: auto; }
 
@@ -697,12 +702,10 @@
       color: var(--text); font-weight: 500; white-space: nowrap; cursor: pointer; text-decoration: none;
       transition: background .25s var(--ease), border-color .25s var(--ease), color .25s var(--ease), transform .25s var(--ease);
     }
-    .btn:hover { background: rgba(255, 255, 255, 0.18); transform: translateY(-1px); }
     .btn:active { transform: scale(.95); transition-duration: .1s; }
     .btn.sm { height: 28px; padding: 0 12px; font-size: 12px; }
     .btn.fit { height: 38px; padding: 0 16px; }
     .btn.primary { background: rgba(255, 255, 255, 0.92); border-color: transparent; color: #14161a; font-weight: 700; }
-    .btn.primary:hover { background: #fff; }
     .field {
       -webkit-appearance: none; appearance: none;
       flex: 1 1 0; min-width: 0; width: 100%; height: 38px; padding: 0 14px; border-radius: 999px;
@@ -724,7 +727,8 @@
       font-weight: 600; cursor: pointer;
       transition: background .25s var(--ease), color .25s var(--ease);
     }
-    .segb:hover { color: #fff; }
+    .segb { transition: background .25s var(--ease), color .25s var(--ease), transform .3s var(--ease); }
+    .segb:active { transform: scale(.94); transition-duration: .1s; }
     .segb { white-space: nowrap; padding: 0 14px; }
     .segb.on { background: rgba(255, 255, 255, 0.20); color: #fff; }
     .seg { position: relative; }
@@ -750,7 +754,6 @@
       border: 1px solid rgba(255, 255, 255, 0.24); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
       transition: transform .3s var(--ease);
     }
-    .item:hover .tfl { transform: translateY(-2px); }
     .tfl .tid {
       flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       color: #fff; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: left;
@@ -758,11 +761,23 @@
     .tfl .tx {
       -webkit-appearance: none; appearance: none; flex: none; border: 0; padding: 0; cursor: pointer;
       width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.14);
-      color: #fff; font-size: 11px; line-height: 22px; text-align: center; transition: background .2s ease;
+      color: #fff; font-size: 11px; line-height: 22px; text-align: center; transition: background .2s ease, transform .3s var(--ease);
     }
-    .tfl .tx:hover { background: rgba(255, 90, 90, 0.85); }
+    .tfl .tx:active { background: rgba(255, 90, 90, 0.85); transform: scale(.86); }
     .ibs.on { color: #ffd54a; background: rgba(255, 213, 74, 0.16); border-color: rgba(255, 213, 74, 0.45); }
     .tog.inl { min-height: 40px; margin-top: 10px; }
+    .acard { text-decoration: none; color: inherit; cursor: pointer; }
+    .acard .tfl { padding-right: 10px; }
+    .fabwrap { display: flex; justify-content: flex-end; margin-top: 14px; }
+    .helpfab {
+      -webkit-appearance: none; appearance: none; flex: none; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; padding: 0; border-radius: 50%;
+      border: 1px solid var(--border); background: rgba(255, 255, 255, 0.10);
+      color: #fff; font: 700 15px/1 -apple-system, 'Malgun Gothic', sans-serif;
+      transition: background .2s var(--ease), transform .3s var(--ease);
+    }
+    .helpfab:active { background: rgba(255, 255, 255, 0.2); transform: scale(.88); transition-duration: .1s; }
 
     .row { display: flex; align-items: center; gap: 6px; }
     .row + .row, .row + .list, .lbl + .row, .row + .lbl, .hint + .lbl { margin-top: 8px; }
@@ -777,16 +792,14 @@
       transition: background .2s var(--ease), color .2s var(--ease), transform .2s var(--ease);
     }
     .ibs svg { width: 16px; height: 16px; display: block; fill: none; }
-    .ibs:hover { background: rgba(255, 255, 255, 0.26); color: #fff; }
     .ibs .ibl { font-size: 12px; font-weight: 600; margin-left: 5px; }
-    .ibs.del:hover { color: #ff9b9b; }
     .ibs:active { transform: scale(.86); transition-duration: .1s; }
     .item {
       display: flex; flex-direction: column; gap: 6px; min-width: 0;
       padding: 6px; border-radius: 16px; background: rgba(255, 255, 255, 0.08);
       transition: background .3s var(--ease), transform .3s var(--ease);
     }
-    .item:hover { background: rgba(255, 255, 255, 0.14); transform: translateY(-2px); }
+    .item:active { background: rgba(255, 255, 255, 0.14); transform: scale(.97); transition-duration: .12s; }
     .tb {
       width: 100%; aspect-ratio: 3 / 4; border-radius: 11px; overflow: hidden;
       background: rgba(0, 0, 0, 0.28); cursor: pointer;
@@ -800,11 +813,10 @@
       position: absolute; top: 6px; right: 6px; z-index: 2;
       width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
       background: rgba(78, 78, 88, 0.82); color: #fff; font-size: 12px; line-height: 24px; text-align: center;
-      transition: background .2s ease;
+      transition: background .2s ease, transform .3s cubic-bezier(.22, 1, .36, 1);
     }
-    .xdel:hover { background: rgba(255, 90, 90, 0.85); }
+    .xdel:active { background: rgba(255, 90, 90, 0.85); transform: scale(.86); }
     .xdel.lt { left: 4px; right: auto; top: 4px; }
-    .item:hover .tb img { transform: scale(1.05); }
     .foot { display: flex; align-items: flex-start; gap: 2px; padding: 0 0 2px 4px; min-width: 0; flex: 1 0 auto; }
     .info { flex: 1 1 0; min-width: 0; cursor: pointer; }
     .info .id { font-weight: 700; color: #fff; }
@@ -833,7 +845,6 @@
       width: 28px; height: 28px; border-radius: 50%; color: var(--sub); font-size: 14px; cursor: pointer;
       transition: color .2s, background .2s, transform .2s var(--ease);
     }
-    .ico:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
     .ico:active { transform: scale(.88); }
     .ico.on { color: #ffd54a; }
 
@@ -847,7 +858,6 @@
       font-size: 12px; cursor: pointer; user-select: none; text-decoration: none; color: #fff;
       transition: background .25s var(--ease), transform .2s var(--ease);
     }
-    .chip:hover { background: rgba(255, 255, 255, 0.18); transform: translateY(-1px); }
     .chip:active { transform: scale(.95); }
     .chip.bad { background: rgba(255, 90, 90, 0.18); border-color: rgba(255, 120, 120, 0.45); }
     .chip.f { background: rgba(255, 110, 150, 0.22); border-color: rgba(255, 130, 165, 0.45); }
@@ -859,7 +869,7 @@
     .row2 { display: flex; gap: 8px; }
     .row2 > div { flex: 1 1 0; min-width: 0; }
     .copy { cursor: pointer; color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 3px; }
-    .copy:hover { color: #d8e6ff; }
+    .copy:active { color: #d8e6ff; }
     .muted { color: var(--sub); padding: 6px 2px; }
 
     .pvgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
@@ -868,6 +878,8 @@
       background: rgba(255, 255, 255, 0.08); color: var(--sub); font-size: 11px;
       display: flex; align-items: center; justify-content: center; cursor: pointer;
     }
+    .pvc { transition: transform .3s var(--ease); }
+    .pvc:active { transform: scale(.95); transition-duration: .1s; }
     .pvc img { display: block; width: 100%; height: 100%; object-fit: cover; }
     .pvc.ok { outline: 1px solid rgba(159, 224, 168, 0.55); outline-offset: -1px; }
     .pvc.cur { outline: 2px solid #fff; outline-offset: -2px; }
@@ -886,7 +898,7 @@
 
     @media (max-width: 520px) {
       .wrap { right: 10px; bottom: 10px; gap: 10px; }
-      .bar { height: 48px; }
+      .bar, .filt { height: 48px; }
       .tl { height: 40px; }
       .cur { font-size: 14px; padding-left: 12px; }
       .ib { width: 36px; height: 36px; }
@@ -1619,93 +1631,67 @@
     });
   }
 
-  async function collectSavedArtists(list, onProgress) {
-    const found = new Map();
-    const add = v => {
-      const s = String(v || '').replace(/_/g, ' ').trim();
-      if (!s) return;
-      const k = normArtName(s);
-      if (k && !found.has(k)) found.set(k, s);
+  function fetchGalleryArtists(gid) {
+    const parse = t => {
+      const s = String(t || '');
+      const i = s.indexOf('{');
+      if (i < 0) return null;
+      try {
+        const o = JSON.parse(s.slice(i).replace(/;\s*$/, ''));
+        if (!o || typeof o !== 'object') return null;
+        if (o.date) noteDate(gid, o.date);
+        return (o.artists || []).map(a => String((a && a.artist) || '').replace(/_/g, ' ').trim()).filter(Boolean);
+      } catch (e) { return null; }
     };
-    const need = [];
-    list.forEach(s => {
-      if (Array.isArray(s.arts) && s.arts.length) s.arts.forEach(add);
-      else need.push(s);
-    });
-    const queue = need.slice(0, 60);
+    const sources = [
+      () => gmGet('https://ltn.hitomi.la/galleries/' + gid + '.js'),
+      () => fetchT('https://ltn.hitomi.la/galleries/' + gid + '.js', { credentials: 'omit' }, 8000).then(r => (r.ok ? r.text() : '')),
+      () => fetchT('/galleries/' + gid + '.js', { credentials: 'same-origin' }, 8000).then(r => (r.ok ? r.text() : ''))
+    ];
+    const tryAt = i => {
+      if (i >= sources.length) { hlog('작가 정보 실패', gid); return Promise.resolve(null); }
+      return sources[i]().then(parse).then(a => a || tryAt(i + 1)).catch(() => tryAt(i + 1));
+    };
+    return tryAt(0);
+  }
+
+  const hasArts = s => !!(s.artsOk || (Array.isArray(s.arts) && s.arts.length));
+
+  // 일지 목록의 작가를 모은다. 결과: [{ name, ids, stars }] (별점 높은 순)
+  async function collectArtists(list, onProgress) {
+    const queue = list.filter(s => !hasArts(s)).slice(0, 80);
     const total = queue.length;
     let done = 0;
     const walk = async () => {
       while (queue.length) {
         const s = queue.shift();
-        try {
-          const r = await fetchT('/galleries/' + s.id + '.html', { credentials: 'same-origin' }, 8000);
-          if (r && r.ok) {
-            const d = new DOMParser().parseFromString(await r.text(), 'text/html');
-            const arts = [];
-            d.querySelectorAll('a[href^="/artist/"]').forEach(a => {
-              if (a.closest('.gallery-content')) return;
-              const m = (a.getAttribute('href') || '').match(/^\/artist\/(.+)-[a-z]+\.html/i);
-              if (!m) return;
-              let v = m[1];
-              try { v = decodeURIComponent(v); } catch (e) {}
-              v = v.replace(/_/g, ' ').trim();
-              if (v && arts.indexOf(v) < 0) arts.push(v);
-            });
-            if (arts.length) {
-              s.arts = arts.slice(0, 16);
-              arts.forEach(add);
-            }
-          }
-        } catch (e) {}
+        const arts = await fetchGalleryArtists(s.id);
+        if (arts) { s.arts = arts.slice(0, 16); s.artsOk = true; }
         done++;
         if (onProgress) onProgress(done, total);
       }
     };
-    await Promise.all(Array.from({ length: Math.min(4, queue.length) }, walk));
-    saveList();
-    return found;
+    if (total) {
+      await Promise.all(Array.from({ length: Math.min(4, total) }, walk));
+      saveList();
+    }
+    const map = new Map();
+    list.forEach(s => (s.arts || []).forEach(a => {
+      const name = String(a || '').replace(/_/g, ' ').trim();
+      const k = normArtName(name);
+      if (!k) return;
+      let o = map.get(k);
+      if (!o) map.set(k, o = { name, ids: [], stars: 0 });
+      if (o.ids.indexOf(s.id) < 0) o.ids.push(s.id);
+      o.stars = Math.max(o.stars, +s.stars || 0);
+    }));
+    return Array.from(map.values()).sort((a, b) => b.stars - a.stars || b.ids.length - a.ids.length || a.name.localeCompare(b.name));
   }
-
-  const BROWSE_SS = 'hk_browse';
-  let onBrowseChange = null;
 
   function browseList() {
     const min = +settings.browseMin || 0;
     return saved.filter(s => s.pick || (min > 0 && (+s.stars || 0) >= min));
   }
-
-  function setBrowseFlag(on) {
-    try {
-      if (on) sessionStorage.setItem(BROWSE_SS, '1');
-      else sessionStorage.removeItem(BROWSE_SS);
-    } catch (e) {}
-  }
-
-  (function restoreBrowse() {
-    let on = false;
-    try { on = sessionStorage.getItem(BROWSE_SS) === '1'; } catch (e) {}
-    if (!on || !currentSort()) return;
-    const list = browseList();
-    if (!list.length) { setBrowseFlag(false); return; }
-    const m = new Map();
-    list.forEach(s => (s.arts || []).forEach(a => {
-      const v = String(a || '').replace(/_/g, ' ').trim();
-      const k = normArtName(v);
-      if (k && !m.has(k)) m.set(k, v);
-    }));
-    browseArtists = m;
-    if (!list.some(s => !(Array.isArray(s.arts) && s.arts.length))) return;
-    collectSavedArtists(list).then(found => {
-      if (!browseArtists) return;
-      if (found.size) browseArtists = found;
-      else { browseArtists = null; setBrowseFlag(false); }
-      applyBrowseFilter();
-      if (settings.mergeTitles) mergeDuplicates();
-      kickInfinite();
-      if (onBrowseChange) onBrowseChange();
-    });
-  })();
 
   let inf = null;
   let infTimer = 0;
@@ -2533,7 +2519,7 @@
           <div class="bottom">
             ${curSort ? `
             <button class="filt pill" type="button" id="filt" title="정렬 바꾸기">
-              ${ICON.sort}<span class="fl">${browseArtists ? '둘러보기' : (SORT_KR[curSort] || '')}</span>
+              ${ICON.sort}<span class="fl">${SORT_KR[curSort] || ''}</span>
             </button>` : ''}
             <div class="bar pill" id="bar">
               ${curId ? `
@@ -2723,10 +2709,13 @@
     let toastTimer = 0;
     function setChars(node, text) {
       node.textContent = '';
-      Array.from(text).forEach((ch, i) => {
+      const chars = Array.from(text);
+      // 글자가 많을수록 간격을 줄여서 전체 등장 시간이 300ms 안팎이 되게 한다
+      const step = chars.length > 1 ? Math.min(35, 300 / (chars.length - 1)) : 0;
+      chars.forEach((ch, i) => {
         const s = document.createElement('span');
         s.className = 'hk-ch';
-        s.style.animationDelay = (140 + Math.min(i, 60) * 35) + 'ms';
+        s.style.animationDelay = Math.round(140 + i * step) + 'ms';
         s.textContent = ch === ' ' ? '\u00a0' : ch;
         node.appendChild(s);
       });
@@ -2765,18 +2754,6 @@
       }
     }
 
-    function paintFilt() {
-      const fl = $('#filt .fl');
-      if (!fl || !curSort) return;
-      const t = browseArtists ? '둘러보기' : (SORT_KR[curSort] || '');
-      if (fl.textContent === t) return;
-      if (settings.typeFx) setChars(fl, t);
-      else fl.textContent = t;
-    }
-    onBrowseChange = () => {
-      paintFilt();
-      if (panelMode === 'sort') growRender(renderSort);
-    };
 
     function segCtl(items, cur, onPick, cls) {
       const seg = el('div', 'seg' + (cls ? ' ' + cls : ''));
@@ -3048,7 +3025,8 @@
       });
       const head = el('div', 'hhead');
       head.append(seg);
-      const body = el('div', 'hbody');
+      const body = el('div', 'hbody at-top');
+      body.addEventListener('scroll', () => body.classList.toggle('at-top', body.scrollTop <= 2), { passive: true });
       panel.append(head, body);
       buildHistBody(body);
     }
@@ -3060,6 +3038,7 @@
       const out = Array.from(panel.querySelectorAll('.hhead .hrow')).concat(Array.from(body.children));
       fadeSwap(out, () => {
         body.scrollTop = 0;
+        body.classList.add('at-top');
         buildHistBody(body);
         return Array.from(panel.querySelectorAll('.hhead .hrow')).concat(Array.from(body.children));
       });
@@ -3177,7 +3156,6 @@
           saveList();
           paintPick();
           toast(it.pick ? '둘러보기에 포함' : '둘러보기에서 제외');
-          if (browseArtists) startBrowse();
         });
         const paintPick = () => {
           const on = !!(savedOf(s.id) || {}).pick;
@@ -3364,24 +3342,25 @@
       const list = el('div', 'slist');
       const cur = currentSort();
       SORTS.forEach(([key, url]) => {
-        const b = el('button', 'srow' + (key === cur && !browseArtists && !browseBusy ? ' on' : ''), SORT_KR[key] || key);
+        const b = el('button', 'srow' + (key === cur ? ' on' : ''), SORT_KR[key] || key);
         b.type = 'button';
-        b.addEventListener('click', () => {
-          setBrowseFlag(false);
-          if (key === cur && (browseArtists || browseBusy)) {
-            stopBrowse();
-            toast('둘러보기를 해제했습니다');
-            return;
-          }
-          location.href = url;
-        });
+        b.addEventListener('click', () => { location.href = url; });
         list.appendChild(b);
       });
-      const bb = el('button', 'srow' + (browseArtists || browseBusy ? ' on' : ''), '둘러보기');
+      const bb = el('button', 'srow', '둘러보기');
       bb.type = 'button';
-      bb.addEventListener('click', () => { if (!browseArtists && !browseBusy) startBrowse(); });
+      bb.addEventListener('click', () => setPanel('browse'));
       list.appendChild(bb);
       panel.appendChild(list);
+    }
+
+    let browseSeq = 0;
+
+    function renderBrowse() {
+      panel.textContent = '';
+      const top = el('div', 'row');
+      top.appendChild(btn('← 정렬', 'sm', () => setPanel('sort')));
+      panel.appendChild(top);
 
       panel.appendChild(el('div', 'lbl', '둘러보기 기준'));
       const min = +settings.browseMin || 0;
@@ -3394,8 +3373,10 @@
         b.addEventListener('click', () => {
           settings.browseMin = (settings.browseMin === i ? 0 : i);
           saveSettings();
-          if (browseArtists || browseBusy) startBrowse();
-          else growRender(renderSort);
+          fadeSwap(Array.from(panel.children), () => {
+            renderBrowse();
+            return Array.from(panel.children);
+          });
         });
         row.appendChild(b);
       }
@@ -3404,70 +3385,72 @@
       const byStar = min ? saved.filter(s => !s.pick && (+s.stars || 0) >= min).length : 0;
       panel.appendChild(el('div', 'hint',
         (min ? '별점 ' + min + '점 이상 일지 ' + byStar + '개' : '별점 기준 없음') +
-        ' + 직접 고른 일지 ' + picks + '개의 작가 작품만 보여줍니다. ' +
-        '일지 목록의 나침반 버튼이나 일지 작성 화면에서 고를 수 있습니다.'));
+        ' + 직접 고른 일지 ' + picks + '개의 작가입니다. 카드를 누르면 그 작가 작품을 검색합니다. ' +
+        '직접 고르기는 일지 목록의 나침반 버튼이나 일지 작성 화면에서 할 수 있습니다.'));
 
-      if (browseBusy) {
-        panel.appendChild(el('div', 'hint browse-status', '일지 작가 정보 확인 중…'));
-      } else if (browseArtists) {
-        const names = Array.from(browseArtists.values());
-        const shown = document.querySelectorAll(
-          '.gallery-content > div:not(.hk-artsoff):not(.hk-hidden):not(.hk-merged):not(.hk-stray)').length;
-        panel.appendChild(el('div', 'hint', '작가 ' + names.length + '명 · 현재 목록에서 ' + shown + '개 작품'));
-        panel.appendChild(el('div', 'lbl', '작가 목록'));
-        const c = el('div', 'chips');
-        names.slice(0, 40).forEach(a => c.appendChild(chipLink(a, `/artist/${enc(a)}-${LANG}.html`, 'a')));
-        panel.appendChild(c);
-      }
+      const box = el('div', 'list');
+      box.id = 'agrid';
+      box.style.marginTop = '12px';
+      panel.appendChild(box);
+      fillBrowse(box);
     }
 
-    function browseApplied() {
-      applyBrowseFilter();
-      if (settings.mergeTitles) mergeDuplicates();
-      paintFilt();
-      kickInfinite();
-    }
-
-    function stopBrowse() {
-      browseSeq++;
-      browseBusy = false;
-      browseArtists = null;
-      setBrowseFlag(false);
-      browseApplied();
-      if (panelMode === 'sort') growRender(renderSort);
-    }
-
-    let browseBusy = false, browseSeq = 0;
-    async function startBrowse() {
+    async function fillBrowse(box) {
       const list = browseList();
       if (!list.length) {
-        toast(saved.length ? '기준에 맞는 일지가 없습니다' : '작성한 일지가 없습니다');
-        if (browseArtists || browseBusy) stopBrowse();
-        else if (panelMode === 'sort') growRender(renderSort);
+        box.appendChild(el('div', 'empty', saved.length ? '기준에 맞는 일지가 없습니다' : '작성한 일지가 없습니다'));
         return;
       }
       const my = ++browseSeq;
-      browseBusy = true;
-      if (panelMode === 'sort') growRender(renderSort);
-      const found = await collectSavedArtists(list, (done, total) => {
-        if (my !== browseSeq || panelMode !== 'sort') return;
-        const st = panel.querySelector('.browse-status');
-        if (st) st.textContent = '일지 작가 정보 확인 중… ' + done + ' / ' + total;
-      });
-      if (my !== browseSeq) return;
-      browseBusy = false;
-      if (!found.size) {
-        toast('일지 작품에서 작가를 찾지 못했습니다');
-        stopBrowse();
-        return;
+      const need = Math.min(80, list.filter(s => !hasArts(s)).length);
+      let st = null;
+      if (need) {
+        st = el('div', 'empty', '일지 작가 정보 확인 중… 0 / ' + need);
+        box.appendChild(st);
       }
-      browseArtists = found;
-      setBrowseFlag(true);
-      browseApplied();
-      const n = document.querySelectorAll(
-        '.gallery-content > div:not(.hk-artsoff):not(.hk-hidden):not(.hk-merged):not(.hk-stray)').length;
-      if (panelMode === 'sort') growRender(renderSort);
-      toast('작가 ' + found.size + '명 · ' + n + '개 작품');
+      const arts = await collectArtists(list, (d, t) => {
+        if (st) st.textContent = '일지 작가 정보 확인 중… ' + d + ' / ' + t;
+      });
+      if (my !== browseSeq || panelMode !== 'browse' || !box.isConnected) return;
+      growRender(() => {
+        box.textContent = '';
+        if (!arts.length) {
+          box.appendChild(el('div', 'empty', '일지 작품에서 작가를 찾지 못했습니다'));
+          return;
+        }
+        arts.forEach(a => box.appendChild(artistCard(a)));
+      });
+      fadeIn(Array.from(box.children));
+    }
+
+    function artistCard(a) {
+      const card = document.createElement('a');
+      card.className = 'item acard';
+      const q = 'artist:' + a.name.toLowerCase().replace(/\s+/g, '_') + ' language:' + LANG;
+      card.href = '/search.html?query=' + encodeURIComponent(q);
+      card.title = a.name + ' 작품 검색';
+      const tb = el('div', 'tb');
+      const tid = a.ids.find(i => thumbs[i]);
+      if (tid) {
+        const im = document.createElement('img');
+        im.alt = '';
+        im.addEventListener('error', () => { im.remove(); tb.insertBefore(el('span', '', '이미지 없음'), tb.firstChild); });
+        im.addEventListener('load', () => im.classList.add('ld'));
+        tb.appendChild(im);
+        queueThumb(im, thumbs[tid]);
+      } else tb.appendChild(el('span', '', '이미지 없음'));
+      const fl = el('div', 'tfl');
+      fl.appendChild(el('span', 'tid', a.name));
+      tb.appendChild(fl);
+      const info = el('div', 'info');
+      const dt = el('div', 'dt');
+      if (a.stars) dt.appendChild(starsEl(a.stars));
+      dt.appendChild(el('div', 'dd', '일지 ' + a.ids.length + '개'));
+      info.appendChild(dt);
+      const foot = el('div', 'foot');
+      foot.appendChild(info);
+      card.append(tb, foot);
+      return card;
     }
 
     function renderSettings() {
@@ -3534,7 +3517,7 @@
           ['제목 아래 날짜', '작품의 게시일자를 작고 흐리게 보여줍니다.'],
           ['오른쪽 아래 ⋯', '작품의 태그와 작가를 팝업으로 보여줍니다.'],
           ['×N 뱃지', '제목이 같은 작품이 여러 개 묶여 있다는 뜻입니다. 누르면 목록이 펼쳐집니다.'],
-          ['정렬 필터', '목록 정렬 방식을 바꿉니다. 둘러보기를 고르면 기준 별점 이상이거나 직접 고른 일지의 작가 작품만 보여줍니다.'],
+          ['정렬 필터', '목록 정렬 방식을 바꿉니다. 둘러보기를 고르면 기준 별점 이상이거나 직접 고른 일지의 작가가 카드로 나오고, 카드를 누르면 그 작가 작품을 검색합니다.'],
           ['하단 알약', '품번 복사, 일지 작성, 검색, 최근·일지 목록, 설정을 엽니다.']
         ]],
         ['리더', [
@@ -3758,11 +3741,56 @@
 
     const btnFor = {
       search: '#searchBtn', hist: '#histBtn', set: '#setBtn', block: '#setBtn', log: '#setBtn',
-      info: '#infoBtn', sort: '#filt', bm: '#star', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn'
+      info: '#infoBtn', sort: '#filt', browse: '#filt', bm: '#star', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn'
     };
+    let metaCard = null;
+    openCardMeta = o => {
+      const same = panelMode === 'meta' && metaCard && metaCard.id === o.id;
+      metaCard = o;
+      if (same) { setPanel(null, true); return; }
+      setPanel('meta');
+    };
+
+    function renderMeta() {
+      panel.textContent = '';
+      const o = metaCard;
+      if (!o) return;
+      const m = o.meta || { artists: [], groups: [], tags: [] };
+      panel.appendChild(el('div', 'lbl', '제목'));
+      panel.appendChild(el('div', 'ttl', settings.koreanTitle ? koreanTitle(o.title || '') : (o.title || '')));
+
+      panel.appendChild(el('div', 'lbl', '작가'));
+      if (m.artists.length || m.groups.length) {
+        const c = el('div', 'chips');
+        m.artists.forEach(a => c.appendChild(chipLink(a, `/artist/${enc(a)}-${LANG}.html`, 'a')));
+        m.groups.forEach(g => c.appendChild(chipLink(g + ' (그룹)', `/group/${enc(g)}-${LANG}.html`, 'a')));
+        panel.appendChild(c);
+      } else panel.appendChild(el('div', 'val', '정보 없음'));
+
+      panel.appendChild(el('div', 'lbl', '태그 (' + m.tags.length + ')'));
+      if (!m.tags.length) panel.appendChild(el('div', 'val', '태그 없음'));
+      const tc = el('div', 'chips');
+      m.tags.forEach(t => {
+        const i = t.indexOf(':');
+        const ns = i > 0 ? t.slice(0, i) : '';
+        const name = i > 0 ? t.slice(i + 1) : t;
+        const cls = ns === 'female' ? 'f' : ns === 'male' ? 'm' : '';
+        const label = (ns === 'female' ? '♀ ' : ns === 'male' ? '♂ ' : '') + name;
+        tc.appendChild(chipLink(label, `/tag/${enc(t)}-${LANG}.html`, cls));
+      });
+      if (m.tags.length) panel.appendChild(tc);
+
+      const r = el('div', 'row');
+      r.style.marginTop = '14px';
+      const cp = btn('품번 ' + o.id, 'sm', () => copyText(o.id).then(() => toast('품번 복사됨')));
+      r.append(btn('작품 열기', 'primary sm', () => { setPanel(null, true); goTo(o.id); }), cp);
+      panel.appendChild(r);
+    }
+
     const RENDERERS = {
+      meta: renderMeta,
       search: renderSearch, hist: renderHist, set: renderSettings, block: renderBlock,
-      log: renderLog, info: renderInfo, sort: renderSort, bm: renderBm,
+      log: renderLog, info: renderInfo, sort: renderSort, browse: renderBrowse, bm: renderBm,
       preview: renderPreview, home: renderHomeChoice, confirm: renderConfirm, help: renderHelp
     };
 
@@ -4129,7 +4157,7 @@
     const path = e.composedPath();
     const hostEl = path.find(n => n && n.classList && n.classList.contains('hk-card-host'));
     if (!hostEl || !hostEl.shadowRoot) return;
-    if (path.some(n => n && n.classList && (n.classList.contains('grp') || n.classList.contains('grplist')))) return;
+    if (path.some(n => n && n.classList && (n.classList.contains('grp') || n.classList.contains('grplist') || n.classList.contains('dots')))) return;
     const sh = hostEl.shadowRoot;
     const a = sh.querySelector('.thumb');
     const cardEl = sh.querySelector('.card');
