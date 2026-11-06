@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.6.0
+// @version      1.7.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.6.0';
+  const VERSION = '1.7.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -283,7 +283,8 @@
   });
 
   // 목록 페이지: 히토미 원래 UI는 처음부터 투명하게 두고, 작품 목록과 이 스크립트가 만든 것만 보이게 한다
-  const LIST_BG_CSS = IS_WORK_PAGE ? '' : `n    html, body { background-color: #111111 !important; }
+  const LIST_BG_CSS = IS_WORK_PAGE ? '' : `
+    html, body { background-color: #111111 !important; }
     body { visibility: hidden !important; }
     .gallery-content, #hk-sentinel, #hk-bg, .page-container { visibility: visible !important; }
   `;
@@ -300,6 +301,8 @@
     .gallery-content > div.hk-hidden, .gallery-content > div.hk-artsoff, .gallery-content > div.hk-merged { display: none !important; }
     .gallery-content > .hk-stray { display: none !important; }
     .hk-vanish { display: none !important; }
+    .gallery-content > div.hk-metaon { z-index: 30 !important; }
+    .gallery-content > div.hk-metaon:active { transform: none !important; }
     ${settings.infinite ? 'html:not(.hk-pager-on) .page-container { display: none !important; }' : ''}
     .gallery-content .hk-hide { display: none !important; }
     ${settings.cardStyle ? `
@@ -790,17 +793,17 @@
     }
     .cdel.out { opacity: 0; }
     .cdel .cq { color: #fff; font-size: 12.5px; font-weight: 700; text-align: center; line-height: 1.35; }
-    .cdel .cbtns { display: flex; gap: 6px; }
+    .cdel .cbtns { display: flex; flex-wrap: nowrap; justify-content: center; gap: 5px; max-width: 100%; }
     .cdel .cb {
       -webkit-appearance: none; appearance: none; cursor: pointer;
-      height: 30px; padding: 0 12px; border-radius: 999px;
+      flex: none; white-space: nowrap; height: 28px; padding: 0 10px; border-radius: 999px;
       border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.12);
-      color: #fff; font: inherit; font-size: 12px; font-weight: 600;
+      color: #fff; font: inherit; font-size: 11.5px; font-weight: 600;
       transition: transform .3s var(--ease);
     }
     .cdel .cb.yes { background: rgba(255, 90, 90, 0.9); border-color: transparent; }
     .cdel .cb:active { transform: scale(.9); transition-duration: .1s; }    .panel.cpop {
-      position: fixed; left: 0; top: 0; z-index: 3; width: 300px;
+      position: absolute; left: 0; top: 0; width: 300px;
       padding: 14px; border-radius: 22px; max-height: 60vh;
       background: rgba(24, 24, 28, 0.82) !important;
     }
@@ -818,6 +821,45 @@
       transition: background .2s var(--ease), transform .3s var(--ease);
     }
     .helpfab:active { background: rgba(255, 255, 255, 0.2); transform: scale(.88); transition-duration: .1s; }
+
+    .pstars { display: flex; align-items: center; margin-right: 2px; }
+    .bstar {
+      -webkit-appearance: none; appearance: none; border: 0; background: none; cursor: pointer; flex: none;
+      width: 22px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+      color: rgba(255, 255, 255, 0.34); transition: color .18s var(--ease), transform .2s var(--ease);
+    }
+    .bstar svg { display: block; width: 18px; height: 18px; fill: none; }
+    .pstars.saved .bstar:not(.on) { color: rgba(255, 213, 74, 0.5); }
+    .bstar.on { color: #ffd54a; }
+    .bstar.on svg { fill: currentColor; }
+    .bstar:active { transform: scale(.8); transition-duration: .1s; }
+    @media (max-width: 520px) {
+      .bstar { width: 19px; height: 36px; }
+      .bstar svg { width: 16px; height: 16px; }
+    }
+
+    .panel.hist > .hbody.jpad { padding-bottom: 104px; }
+    .jfoot {
+      position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3;
+      display: flex; flex-direction: column; gap: 6px; padding: 6px;
+      border-radius: 22px; background: rgba(34, 34, 40, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+    }
+    .jfr { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .jfr .jn { color: var(--sub); font-size: 11.5px; font-weight: 600; padding-left: 8px; white-space: nowrap; }
+    .seg.sf { width: 100%; }
+    .seg.sf .segb { flex: 1 1 0; min-width: 0; padding: 0 2px; }
+    .sdiv {
+      grid-column: 1 / -1; display: flex; align-items: center; gap: 8px;
+      margin: 8px 2px 0; color: #ffd54a; font-size: 12px; font-weight: 700;
+    }
+    .sdiv:first-child { margin-top: 0; }
+    .sdiv::after { content: ''; order: 1; flex: 1 1 auto; height: 1px; background: rgba(255, 255, 255, 0.18); }
+    .sdiv .sdn { order: 2; color: var(--sub); font-size: 11px; font-weight: 600; }
+    .sdiv .sdl.none { color: var(--sub); }
+    .sdiv .st { display: inline-flex; }
+    .sdiv .st svg { width: 13px; height: 13px; fill: none; }
+    .sdiv .st svg.on { fill: currentColor; }
 
     .row { display: flex; align-items: center; gap: 6px; }
     .row + .row, .row + .list, .lbl + .row, .row + .lbl, .hint + .lbl { margin-top: 8px; }
@@ -899,7 +941,6 @@
       transition: background .25s var(--ease), transform .2s var(--ease);
     }
     .chip:active { transform: scale(.95); }
-    .chip.bad { background: rgba(255, 90, 90, 0.18); border-color: rgba(255, 120, 120, 0.45); }
     .chip.f { background: rgba(255, 110, 150, 0.22); border-color: rgba(255, 130, 165, 0.45); }
     .chip.m { background: rgba(100, 160, 255, 0.22); border-color: rgba(120, 170, 255, 0.45); }
     .chip.a { background: rgba(160, 130, 255, 0.22); border-color: rgba(175, 150, 255, 0.45); }
@@ -962,6 +1003,12 @@
       transition: background-color .38s cubic-bezier(.45, 0, .25, 1), visibility 0s;
     }
     #hk-fx-ov.nt { transition: none !important; visibility: visible; }
+    @keyframes hkSpin { to { transform: rotate(360deg); } }
+    .hk-spin {
+      position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px;
+      border-radius: 50%; border: 2.5px solid rgba(255, 255, 255, 0.22); border-top-color: rgba(255, 255, 255, 0.9);
+      animation: hkSpin .8s linear infinite;
+    }
     .hk-zoom img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
     .hk-zoom img.hk-z-thumb { object-fit: cover; transition: opacity .35s ease; }
     .hk-zoom img.hk-z-page { object-fit: contain; opacity: 0; transition: opacity .35s ease; }
@@ -2463,8 +2510,7 @@
         <div class="scrim" id="scrim"></div>
         <div class="glass" id="glass"></div>
         ${IS_WORK_PAGE ? '' : '<div class="fxtop"></div><div class="fxbot"></div>'}
-        <div class="cpop panel pill" id="cpop"></div>
-        <div class="wrap" id="wrap">
+                <div class="wrap" id="wrap">
           <div class="stack">
             <div class="toast pill" id="toast"></div>
             <div class="panel pill" id="panel"></div>
@@ -2482,7 +2528,7 @@
             <div class="bar pill" id="bar">
               ${curId ? `
               <button class="cur" type="button" id="curNum" title="품번 복사">${curId}</button>
-              <button class="ib pin" type="button" id="star" title="일지 작성">${ICON.journal}</button>` : ''}
+              <div class="pstars" id="pstars" title="별점을 누르면 일지에 남깁니다">${[1, 2, 3, 4, 5].map(i => `<button class="bstar" type="button" data-n="${i}" title="${i}점" aria-label="${i}점">${starSvg(false)}</button>`).join('')}</div>` : ''}
               <button class="ib" type="button" id="searchBtn" title="검색">${ICON.search}</button>
               <button class="ib" type="button" id="histBtn" title="최근 / 일지">${ICON.hist}</button>
               <button class="ib gear" type="button" id="setBtn" title="설정">${ICON.gear}</button>
@@ -2511,12 +2557,14 @@
     let histMode = 'recent';
     let filterText = '';
     let histFilter = '';
+    let starFilter = 'all';
+    let bmStars = null;
+    let bmSetStars = null;
     let sItems = [], sIdx = -1;
     let sInput = null;
     let sgSeq = 0;
     let bmId = null;
     let bmBack = null;
-    let blockDraft = '';
     let confirmCb = null;
 
     function syncGlass() {
@@ -2636,32 +2684,15 @@
       growFrom(h0);
     }
 
-    function fadeOut(nodes) {
-      nodes.forEach(k => k.animate && k.animate(
-        [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-4px) scale(.985)' }],
-        { duration: SWAP_OUT, easing: 'ease-in', fill: 'forwards' }));
-    }
-
-    function fadeIn(nodes) {
-      nodes.forEach((k, i) => k.animate && k.animate(
-        [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
-        { duration: 320, delay: 50 + Math.min(i, 6) * 28, easing: SWAP_EASE, fill: 'backwards' }));
-    }
-
-    // 지금 요소를 흐리게 지운 뒤 build()로 새 요소를 만들고, 높이를 바꾸며 바로 보여준다
+    // 글자 등장 효과 없이 내용만 바로 바꾸고, 팝업 크기만 부드럽게 맞춘다
     function fadeSwap(outNodes, build) {
-      const my = ++swapSeq;
+      ++swapSeq;
       clearTimeout(swapT);
       const h0 = panel.offsetHeight;
-      panel.style.overflow = 'hidden';
-      panel.style.height = h0 + 'px';
-      fadeOut(outNodes);
-      swapT = setTimeout(() => {
-        if (my !== swapSeq) return;
-        const fresh = build() || [];
-        growFrom(h0);
-        fadeIn(fresh);
-      }, SWAP_OUT);
+      panel.style.transition = '';
+      panel.style.height = '';
+      build();
+      growFrom(h0);
     }
 
     let toastTimer = 0;
@@ -2684,18 +2715,23 @@
       t.classList.toggle('has-act', !!act);
       popOpen(t, null);
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => popClose(t, null), act ? 4500 : 1600);
+      toastTimer = setTimeout(() => popClose(t, null), act ? 6000 : 1600);
+    }
+
+    function paintPill(n) {
+      const ps = $('#pstars');
+      if (!ps) return;
+      Array.from(ps.children).forEach((b, i) => b.classList.toggle('on', i < n));
     }
 
     function updateCounts() {
-      const st = $('#star');
-      if (st && curId) {
-        const on = isSaved(curId);
-        st.classList.toggle('on', on);
-        st.title = on ? '일지 수정' : '일지 작성 (별명·별점)';
-      }
+      const ps = $('#pstars');
+      if (!ps || !curId) return;
+      const it = savedOf(curId);
+      paintPill(it ? (+it.stars || 0) : 0);
+      ps.classList.toggle('saved', !!it);
+      ps.title = it ? '일지에 있음 · 눌러서 별점·별명 수정' : '별점을 누르면 일지에 남깁니다';
     }
-
 
     function segCtl(items, cur, onPick, cls) {
       const seg = el('div', 'seg' + (cls ? ' ' + cls : ''));
@@ -2995,6 +3031,8 @@
       body.textContent = '';
       const head = panel.querySelector('.hhead');
       head.querySelectorAll('.hrow').forEach(n => n.remove());
+      panel.querySelectorAll('.jfoot').forEach(n => n.remove());
+      body.classList.toggle('jpad', histMode === 'saved');
       const r1 = el('div', 'row hrow');
       const search = el('input', 'field');
       if (histMode === 'saved') {
@@ -3002,21 +3040,27 @@
         search.value = filterText;
         search.addEventListener('input', () => { filterText = search.value.trim().toLowerCase(); renderItems(); });
         r1.append(search, btn('전체복사', 'fit', () => copyIds(saved.map(s => s.id))));
-        const bar = el('div', 'jbar');
-        const cnt = el('span', 'jn', '일지 ' + saved.length + '개');
+        const list = el('div', 'list');
+        list.id = 'items';
+        head.append(r1);
+        body.append(list);
+
+        // 일지 개수 · 별점 필터 · 정렬은 팝업 아래쪽에 떠 있게 둔다
+        const foot = el('div', 'jfoot');
+        const sf = segCtl([['all', '전체'], ['5', '★5'], ['4', '★4'], ['3', '★3'], ['2', '★2'], ['1', '★1'], ['0', '없음']],
+          starFilter, k => { starFilter = k; body.scrollTop = 0; growRender(renderItems); }, 'sm sf');
+        const fr = el('div', 'jfr');
+        const cnt = el('span', 'jn', '');
         cnt.id = 'jcount';
         const sort = segCtl([['date', '작성일순'], ['stars', '별점순']], settings.jSort === 'stars' ? 'stars' : 'date', k => {
           settings.jSort = k;
           saveSettings();
-          const box = panel.querySelector('#items');
-          if (!box) return;
-          fadeSwap(Array.from(box.children), () => { renderItems(); return Array.from(box.children); });
+          body.scrollTop = 0;
+          growRender(renderItems);
         }, 'sm');
-        bar.append(cnt, sort);
-        const list = el('div', 'list');
-        list.id = 'items';
-        head.append(r1);
-        body.append(bar, list);
+        fr.append(cnt, sort);
+        foot.append(sf, fr);
+        panel.append(foot);
         renderItems();
       } else {
         search.placeholder = '기록 검색 (품번)';
@@ -3041,25 +3085,56 @@
       return b;
     }
 
+    // 지운 일지를 되돌릴 수 있는 토스트
+    function undoToast(item, idx) {
+      toast('일지를 삭제했습니다', { label: '되돌리기', fn: () => {
+        if (isSaved(item.id)) return;
+        saved.splice(Math.max(0, Math.min(idx, saved.length)), 0, item);
+        saveList();
+        updateCounts();
+        if (panelMode === 'hist' && histMode === 'saved') reflowList('#items', renderItems, item.id);
+      } });
+    }
+
     function renderItems() {
       const box = panel.querySelector('#items');
       if (!box) return;
       box.textContent = '';
       const f = filterText;
+      const items = saved.filter(s => (!f || s.id.includes(f) ||
+        (s.alias || '').toLowerCase().includes(f) || (s.title || '').toLowerCase().includes(f)) &&
+        (starFilter === 'all' || (+s.stars || 0) === +starFilter));
       const cnt = panel.querySelector('#jcount');
-      if (cnt) cnt.textContent = '일지 ' + saved.length + '개';
-      const items = saved.filter(s => !f || s.id.includes(f) ||
-        (s.alias || '').toLowerCase().includes(f) || (s.title || '').toLowerCase().includes(f));
-      if (settings.jSort === 'stars') {
+      if (cnt) cnt.textContent = items.length === saved.length
+        ? '일지 ' + saved.length + '개'
+        : '일지 ' + items.length + ' / ' + saved.length + '개';
+      const byStars = settings.jSort === 'stars';
+      if (byStars) {
         items.sort((a, b) => (+b.stars || 0) - (+a.stars || 0) || (b.ts || 0) - (a.ts || 0));
       } else {
         items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
       }
       if (!items.length) {
-        box.appendChild(el('div', 'empty', saved.length ? '검색 결과가 없습니다' : '작성한 일지가 없습니다'));
+        box.appendChild(el('div', 'empty', !saved.length ? '작성한 일지가 없습니다'
+          : (starFilter !== 'all' && !f ? '이 별점의 일지가 없습니다' : '검색 결과가 없습니다')));
         return;
       }
+      const per = new Map();
+      if (byStars) items.forEach(s => { const k = +s.stars || 0; per.set(k, (per.get(k) || 0) + 1); });
+      let last = null;
       items.forEach(s => {
+        const st = +s.stars || 0;
+        if (byStars && st !== last) {
+          last = st;
+          const d = el('div', 'sdiv');
+          d.dataset.sk = String(st);
+          const lb = el('span', 'sdl' + (st ? '' : ' none'));
+          if (st) lb.appendChild(starsEl(st));
+          else lb.textContent = '별점 없음';
+          d.append(lb, el('span', 'sdn', per.get(st) + '개'));
+          box.appendChild(d);
+        }
+
         const row = el('div', 'item');
         row.dataset.id = s.id;
         const info = el('div', 'info');
@@ -3091,40 +3166,40 @@
             const item = savedOf(s.id);
             removeSaved(s.id);
             updateCounts();
-            const cnt = panel.querySelector('#jcount');
-            if (cnt) cnt.textContent = '일지 ' + saved.length + '개';
-            if (!saved.length) renderItems();
-            if (!item) return;
-            toast('일지를 삭제했습니다', { label: '되돌리기', fn: () => {
-              if (isSaved(item.id)) return;
-              saved.splice(Math.max(0, Math.min(idx, saved.length)), 0, item);
-              saveList();
-              updateCounts();
-              if (panelMode === 'hist' && histMode === 'saved') reflowList('#items', renderItems, item.id);
-            } });
+            renderItems();
+            if (item) undoToast(item, idx);
           }));
         });
         fl.append(tid, del);
-        tb.appendChild(fl);        const acts = el('div', 'acts');
+        tb.appendChild(fl);
+        const acts = el('div', 'acts');
         acts.append(iconBtn(ICON.edit, '일지 수정', () => openBm(s.id, 'hist')));
         row.append(tb, foot, acts);
         box.appendChild(row);
       });
     }
 
-    // 목록을 다시 그리면서, 기존 카드는 원래 자리에서 미끄러지고 되돌린 카드는 커지며 나타나게 한다
-    function reflowList(sel, render, newId) {
-      const box = panel.querySelector(sel);
-      if (!box) return;
-      const first = new Map();
-      Array.from(box.children).forEach(c => { if (c.dataset.id) first.set(c.dataset.id, c.getBoundingClientRect()); });
-      render();
+    // 카드(data-id)와 별점 구분선(data-sk)을 같은 열쇠로 묶어, 다시 그린 뒤에도 원래 자리에서 미끄러지게 한다
+    const flipKey = c => (c && c.dataset) ? (c.dataset.id || (c.dataset.sk != null ? 's' + c.dataset.sk : '')) : '';
+    function snapRects(box, skip) {
+      const m = new Map();
+      Array.from(box.children).forEach(c => {
+        if (c === skip) return;
+        const k = flipKey(c);
+        if (k) m.set(k, c.getBoundingClientRect());
+      });
+      return m;
+    }
+    function flipFrom(box, first, newId) {
       Array.from(box.children).forEach(c => {
         if (!c.animate) return;
-        const f = first.get(c.dataset.id);
-        if (c.dataset.id === newId || !f) {
-          c.animate([{ opacity: 0, transform: 'scale(.82)' }, { opacity: 1, transform: 'none' }],
-            { duration: 340, easing: SWAP_EASE });
+        const k = flipKey(c);
+        const f = k && first.get(k);
+        if (!f) {
+          if (k && (newId == null || c.dataset.id === newId || c.dataset.sk != null)) {
+            c.animate([{ opacity: 0, transform: 'scale(.82)' }, { opacity: 1, transform: 'none' }],
+              { duration: 340, easing: SWAP_EASE });
+          }
           return;
         }
         const l = c.getBoundingClientRect();
@@ -3132,6 +3207,15 @@
         if (dx || dy) c.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
           { duration: 420, easing: SWAP_EASE });
       });
+    }
+
+    // 목록을 다시 그리면서, 기존 카드는 원래 자리에서 미끄러지고 되돌린 카드는 커지며 나타나게 한다
+    function reflowList(sel, render, newId) {
+      const box = panel.querySelector(sel);
+      if (!box) return;
+      const first = snapRects(box);
+      render();
+      flipFrom(panel.querySelector(sel) || box, first, newId);
     }
 
     // 카드 위에 "삭제할까요?" 확인을 띄운다
@@ -3163,20 +3247,13 @@
     function removeCard(row, apply) {
       const box = row.parentElement;
       if (!box) { apply(); return; }
-      const sibs = Array.from(box.children).filter(c => c !== row);
-      const first = new Map(sibs.map(c => [c, c.getBoundingClientRect()]));
+      const sel = box.id ? '#' + box.id : null;
+      const first = snapRects(box, row);
       const finish = () => {
         const h0 = panel.offsetHeight;
         row.remove();
         apply();
-        sibs.forEach(c => {
-          if (!c.isConnected || !c.animate) return;
-          const f = first.get(c), l = c.getBoundingClientRect();
-          const dx = f.left - l.left, dy = f.top - l.top;
-          if (!dx && !dy) return;
-          c.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
-            { duration: 420, easing: SWAP_EASE });
-        });
+        flipFrom((sel && panel.querySelector(sel)) || box, first, '');
         if (!panel.classList.contains('hist')) growFrom(h0);
       };
       if (!row.animate) { finish(); return; }
@@ -3185,6 +3262,7 @@
         { duration: 220, easing: 'ease-in', fill: 'forwards' });
       a.onfinish = finish;
     }
+
     function renderHistItems() {
       const box = panel.querySelector('#hitems');
       if (!box) return;
@@ -3236,12 +3314,18 @@
       });
     }
 
-    function openBm(id, back) {
+    function openBm(id, back, stars) {
       if (!id) return;
-      const same = panelMode === 'bm' && bmId === id;
+      bmStars = stars != null ? stars : null;
+      if (panelMode === 'bm') {
+        const same = bmId === id;
+        bmId = id;
+        if (same) renderBm();
+        else growRender(renderBm);
+        return;
+      }
       bmId = id;
-      if (same) { renderBm(); return; }
-      bmBack = back || (panelMode && panelMode !== 'bm' ? panelMode : null);
+      bmBack = back || panelMode || null;
       setPanel('bm');
     }
 
@@ -3249,6 +3333,8 @@
       const to = bmBack;
       bmId = null;
       bmBack = null;
+      bmSetStars = null;
+      updateCounts();
       setPanel(to || null, !to);
     }
 
@@ -3263,9 +3349,11 @@
         if (pageT && settings.koreanTitle) pageT = koreanTitle(pageT);
       }
       const title = (it && it.title) || pageT || dates[bmId] || '';
-      let stars = (it && it.stars) || 0;
+      const fromPill = bmStars != null;
+      let stars = fromPill ? bmStars : ((it && it.stars) || 0);
+      bmStars = null;
 
-      panel.appendChild(el('div', 'lbl', it ? '일지 수정' : '일지 작성'));
+      panel.appendChild(el('div', 'lbl', it ? '일지 수정' : '별명을 정해 일지에 남기기'));
       panel.appendChild(el('div', 'bmt', bmId + (title ? '  ·  ' + title : '')));
 
       const r1 = el('div', 'row');
@@ -3284,6 +3372,7 @@
       const paint = () => {
         Array.from(row.children).forEach((b, i) => b.classList.toggle('on', i < stars));
         row.title = stars ? stars + '점' : '별점 없음 (눌러서 매기기)';
+        if (isCur) paintPill(stars);
       };
       for (let i = 1; i <= 5; i++) {
         const b = el('button', 'starb');
@@ -3294,7 +3383,8 @@
       }
       paint();
       panel.appendChild(row);
-
+      // 하단 알약의 별을 다시 눌러도 이 창의 별점이 바뀐다
+      bmSetStars = isCur ? (n => { stars = (stars === n ? 0 : n); paint(); }) : null;
 
       const save = () => {
         const alias = inp.value.trim();
@@ -3315,14 +3405,22 @@
       r2.append(btn('저장', 'primary', save), btn('취소', 'sm', backFromBm));
       if (isSaved(bmId)) {
         r2.appendChild(btn('삭제', 'sm', () => {
+          const idx = saved.findIndex(x => x.id === bmId);
+          const item = savedOf(bmId);
           removeSaved(bmId);
           updateCounts();
-          toast('일지를 삭제했습니다');
           backFromBm();
+          if (item) undoToast(item, idx);
         }));
       }
       panel.appendChild(r2);
-      panel.appendChild(el('div', 'hint', '별명을 적으면 제목 대신 그 별명이 보입니다. 별점은 일지 목록에 ★로 표시됩니다.'));
+      panel.appendChild(el('div', 'hint', '별명을 적으면 제목 대신 그 별명이 보입니다. 저장하면 일지에 남습니다.'));
+      if (fromPill) {
+        setTimeout(() => {
+          if (!inp.isConnected) return;
+          try { inp.focus({ preventScroll: true }); } catch (e) {}
+        }, 380);
+      }
     }
 
     function importList() {
@@ -3409,17 +3507,14 @@
 
       panel.appendChild(el('div', 'lbl', '도구'));
       const tr = el('div', 'row');
-      tr.appendChild(btn('진단 로그 보기', '', () => setPanel('log')));
-      panel.appendChild(tr);
-
-      const fab = el('div', 'fabwrap');
+      tr.style.justifyContent = 'space-between';
       const hb = el('button', 'helpfab', '?');
       hb.type = 'button';
       hb.title = '기능 설명';
       hb.setAttribute('aria-label', '기능 설명');
       hb.addEventListener('click', () => setPanel('help'));
-      fab.appendChild(hb);
-      panel.appendChild(fab);
+      tr.append(btn('진단 로그 보기', '', () => setPanel('log')), hb);
+      panel.appendChild(tr);
     }
 
     function renderHelp() {
@@ -3433,7 +3528,9 @@
           ['오른쪽 아래 ⋯', '작품의 태그와 작가를 팝업으로 보여줍니다.'],
           ['×N 뱃지', '제목이 같은 작품이 여러 개 묶여 있다는 뜻입니다. 누르면 목록이 펼쳐집니다.'],
           ['정렬 필터', '목록 정렬 방식을 바꿉니다.'],
-          ['하단 알약', '품번 복사, 일지 작성, 검색, 최근·일지 목록, 설정을 엽니다.']
+          ['하단 알약', '품번 복사, 별점, 검색, 최근·일지 목록, 설정을 엽니다.'],
+          ['별 5개', '작품 화면 하단 알약의 별을 누르면 별점이 매겨지고, 위로 뜨는 창에서 별명을 정해 저장하면 일지에 남습니다.'],
+          ['일지 목록', '아래쪽 막대에서 별점별로 골라 보거나 작성일순·별점순으로 정렬합니다. 별점순일 때는 별점마다 구분선이 들어갑니다. 지운 일지는 되돌리기로 살릴 수 있습니다.']
         ]],
         ['리더', [
           ['왼쪽 탭 · ←', '다음 페이지로 넘어갑니다.'],
@@ -3450,7 +3547,6 @@
           ['Pre Load', '다음 페이지를 미리 받습니다. 목록에서는 화면에 보이는 작품의 1페이지를 미리 받습니다.'],
           ['Only Korean', '한국어 작품만 보여줍니다. 바꾸면 새로고침합니다.'],
           ['Unlimited scroll', '목록을 끝없이 이어 붙입니다. 바꾸면 새로고침합니다.'],
-          ['차단 목록 관리', '태그와 작가 차단을 관리합니다.'],
           ['일지 내보내기·가져오기', '일지를 JSON으로 복사하거나 붙여넣습니다.'],
           ['진단 로그 보기', '미리 받기 실패 같은 문제를 확인합니다.']
         ]]
@@ -3464,63 +3560,6 @@
         });
         panel.appendChild(box);
       });
-    }
-
-    function renderBlock() {
-      const keepScroll = panel.scrollTop;
-      panel.textContent = '';
-
-      const r1 = el('div', 'row');
-      const inp = el('input', 'field');
-      inp.type = 'text';
-      inp.placeholder = '예) female:ntr · artist:이름';
-      inp.autocomplete = 'off';
-      inp.value = blockDraft;
-      inp.addEventListener('input', () => { blockDraft = inp.value; });
-      const doAdd = () => {
-        if (!normBlock(inp.value)) { toast('차단할 태그를 입력하세요'); return; }
-        toast(addBlock(inp.value) ? '차단 목록에 추가' : '이미 있는 항목입니다');
-        blockDraft = '';
-        renderBlock();
-      };
-      inp.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
-      r1.append(inp, btn('추가', 'primary', doAdd));
-      panel.appendChild(r1);
-
-      panel.appendChild(el('div', 'hint',
-        '태그는 그대로(female:ntr), 작가·그룹은 artist:이름 / group:이름 으로 입력합니다. ' +
-        '태그 이름만 쓰면(ntr) female/male 구분 없이 모두 차단됩니다.'));
-      if (!settings.blockTags) panel.appendChild(el('div', 'hint', '※ 지금은 차단 기능이 꺼져 있습니다 (설정에서 켜기)'));
-
-      const hidden = document.querySelectorAll('.gallery-content > div.hk-blocked').length;
-      panel.appendChild(el('div', 'lbl', '차단 목록 (' + blocked.length + ')' + (hidden ? ' · 이 페이지에서 ' + hidden + '개 숨김' : '')));
-      const bc = el('div', 'chips');
-      if (!blocked.length) bc.appendChild(el('div', 'hint', '차단한 항목이 없습니다'));
-      blocked.forEach(b => {
-        const c = el('span', 'chip bad', b + '  ✕');
-        c.title = '눌러서 차단 해제';
-        c.addEventListener('click', () => { removeBlock(b); renderBlock(); });
-        bc.appendChild(c);
-      });
-      panel.appendChild(bc);
-
-      const cnt = new Map();
-      document.querySelectorAll('.gallery-content > div').forEach(card => {
-        const info = getCardInfo(card);
-        if (!info) return;
-        info.tags.forEach(t => { if (blocked.indexOf(t) < 0) cnt.set(t, (cnt.get(t) || 0) + 1); });
-      });
-      const top = Array.from(cnt.entries()).sort((a, b) => b[1] - a[1]).slice(0, 40);
-      panel.appendChild(el('div', 'lbl', '이 페이지의 태그/작가 (눌러서 차단)'));
-      const pc = el('div', 'chips');
-      if (!top.length) pc.appendChild(el('div', 'hint', '작품 목록 페이지에서 열면 표시됩니다'));
-      top.forEach(([t, n]) => {
-        const c = el('span', 'chip', t + '  ' + n);
-        c.addEventListener('click', () => { addBlock(t); renderBlock(); });
-        pc.appendChild(c);
-      });
-      panel.appendChild(pc);
-      panel.scrollTop = keepScroll;
     }
 
     function renderLog() {
@@ -3655,71 +3694,78 @@
     }
 
     const btnFor = {
-      search: '#searchBtn', hist: '#histBtn', set: '#setBtn', block: '#setBtn', log: '#setBtn',
-      info: '#infoBtn', sort: '#filt', bm: '#star', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn'
+      search: '#searchBtn', hist: '#histBtn', set: '#setBtn', log: '#setBtn',
+      info: '#infoBtn', sort: '#filt', bm: '#pstars', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn'
     };
-    // ⋯ 상세정보: 작품 카드 바로 아래(공간이 없으면 위)에 붙어서 뜨는 팝업
-    const cpop = $('#cpop');
-    let metaCard = null, metaHost = null, metaRaf = 0;
-    const metaOpen = () => cpop.classList.contains('open') && !cpop.classList.contains('out');
+    // ⋯ 상세정보: 팝업을 작품 카드 안에 붙여서, 스크롤해도 카드와 한 몸처럼 움직이게 한다
+    let metaCard = null, meta = null;
+    const metaOpen = () => !!meta;
     window.__hkMetaOpen = metaOpen;
+    let metaSheet = null;
+    try { metaSheet = new CSSStyleSheet(); metaSheet.replaceSync(PANEL_CSS); } catch (e) { metaSheet = null; }
 
-    function placeMeta() {
-      metaRaf = 0;
-      if (!metaHost || !cpop.classList.contains('open')) return;
-      if (!metaHost.isConnected) { closeMeta(); return; }
-      const r = metaHost.getBoundingClientRect();
+    function closeMeta(instant) {
+      const m = meta;
+      meta = null;
+      if (!m) return;
+      const done = () => {
+        try { m.host.remove(); } catch (e) {}
+        if (!(meta && meta.card === m.card)) m.card.classList.remove('hk-metaon');
+      };
+      if (instant) { done(); return; }
+      popClose(m.pop, null, done);
+    }
+
+    // 여는 순간 한 번만 자리를 정한다 (아래 공간이 모자라면 위로). 그 뒤로는 카드와 같이 스크롤된다
+    function placeMeta(m) {
+      const r = m.card.getBoundingClientRect();
       const vw = window.innerWidth, vh = window.innerHeight;
       const w = Math.min(Math.max(r.width + 40, 280), vw - 24);
-      cpop.style.width = w + 'px';
+      m.pop.style.width = w + 'px';
       const left = Math.max(12, Math.min(vw - w - 12, r.left + r.width / 2 - w / 2));
-      const h = cpop.offsetHeight;
+      const h = m.pop.offsetHeight;
       const below = vh - r.bottom - 12, above = r.top - 12;
       const down = below >= h + 10 || below >= above;
-      const top = down ? r.bottom + 10 : r.top - 10 - h;
-      cpop.style.left = left + 'px';
-      cpop.style.top = Math.max(12, Math.min(vh - h - 12, top)) + 'px';
-      cpop.style.maxHeight = Math.max(160, (down ? below : above) - 10) + 'px';
-      cpop.style.transformOrigin = (r.left + r.width / 2 - left) + 'px ' + (down ? '0' : '100%');
+      m.pop.style.left = (left - r.left) + 'px';
+      m.pop.style.top = (down ? r.height + 10 : -10 - h) + 'px';
+      m.pop.style.transformOrigin = (r.left + r.width / 2 - left) + 'px ' + (down ? '0' : '100%');
     }
-    const queuePlace = () => { if (!metaRaf && metaHost) metaRaf = requestAnimationFrame(placeMeta); };
-    window.addEventListener('scroll', queuePlace, { passive: true });
-    window.addEventListener('resize', queuePlace);
-
-    function closeMeta() {
-      metaHost = null;
-      popClose(cpop, null, () => { if (!metaHost) cpop.textContent = ''; });
-    }
+    window.addEventListener('resize', () => { if (meta) placeMeta(meta); });
 
     openCardMeta = (o, hostEl) => {
-      if (metaOpen() && metaCard && metaCard.id === o.id) { closeMeta(); return; }
+      if (meta && metaCard && metaCard.id === o.id) { closeMeta(); return; }
+      // 다른 카드의 ⋯ 를 누르면 기존 팝업은 바로 치우고 새 팝업을 띄운다
+      if (meta) closeMeta(true);
       if (panelMode) setPanel(null, true);
-      const moving = metaOpen();
+      const card = hostEl && hostEl.parentElement;
+      if (!card) return;
       metaCard = o;
-      metaHost = hostEl || null;
-      if (moving) {
-        // 다른 카드로 옮길 때: 내용만 바꾸고 새 위치로 부드럽게 이동
-        const r0 = cpop.getBoundingClientRect();
-        renderMeta();
-        placeMeta();
-        const r1 = cpop.getBoundingClientRect();
-        if (cpop.animate) cpop.animate([
-          { transform: `translate(${r0.left - r1.left}px, ${r0.top - r1.top}px)`, opacity: .6 },
-          { transform: 'none', opacity: 1 }
-        ], { duration: 320, easing: SWAP_EASE });
-        fadeIn(Array.from(cpop.children));
-        return;
-      }
-      renderMeta();
-      cpop.classList.add('open');
-      placeMeta();
-      popOpen(cpop, null);
+      const h = document.createElement('div');
+      h.className = 'hk-meta-host';
+      h.style.cssText = 'all:initial!important;position:absolute!important;left:0!important;top:0!important;' +
+        'width:0!important;height:0!important;z-index:40!important;display:block!important;';
+      const s = h.attachShadow({ mode: 'open' });
+      if (metaSheet) s.adoptedStyleSheets = [metaSheet];
+      else { const st = document.createElement('style'); st.textContent = PANEL_CSS; s.appendChild(st); }
+      const mroot = document.createElement('div');
+      mroot.className = 'root';
+      const pop = document.createElement('div');
+      pop.className = 'cpop panel pill';
+      mroot.appendChild(pop);
+      s.appendChild(mroot);
+      card.classList.add('hk-metaon');
+      card.appendChild(h);
+      meta = { host: h, pop, card };
+      renderMeta(pop);
+      pop.classList.add('open');
+      placeMeta(meta);
+      popOpen(pop, null);
     };
 
     document.addEventListener('click', e => {
-      if (!metaOpen()) return;
+      if (!meta) return;
       const path = e.composedPath();
-      if (path.includes(cpop)) return;
+      if (path.includes(meta.pop)) return;
       if (path.some(n => n && n.classList && n.classList.contains('dots'))) return;
       if (path.includes(host)) { closeMeta(); return; }
       e.preventDefault();
@@ -3727,8 +3773,7 @@
       closeMeta();
     }, true);
 
-    function renderMeta() {
-      const box = cpop;
+    function renderMeta(box) {
       box.textContent = '';
       box.scrollTop = 0;
       const o = metaCard;
@@ -3764,7 +3809,7 @@
       box.appendChild(r);
     }
     const RENDERERS = {
-      search: renderSearch, hist: renderHist, set: renderSettings, block: renderBlock,
+      search: renderSearch, hist: renderHist, set: renderSettings,
       log: renderLog, info: renderInfo, sort: renderSort, bm: renderBm,
       preview: renderPreview, home: renderHomeChoice, confirm: renderConfirm, help: renderHelp
     };
@@ -3774,6 +3819,7 @@
       else if (panelMode === mode) mode = null;
       const prev = panelMode;
       panelMode = mode;
+      if (prev === 'bm' && mode !== 'bm') { bmSetStars = null; updateCounts(); }
 
       const activeSel = mode ? btnFor[mode] : null;
       Object.values(btnFor).forEach(sel => {
@@ -3825,16 +3871,10 @@
       panel.getAnimations().forEach(a => a.cancel());
       const h0 = panel.offsetHeight, w0 = panel.offsetWidth;
       panel.style.transition = '';
-      panel.style.overflow = 'hidden';
-      panel.style.height = h0 + 'px';
-      panel.style.width = w0 + 'px';
-      fadeOut(Array.from(panel.children));
-      swapT = setTimeout(() => {
-        if (my !== swapSeq) return;
-        paintMode(mode);
-        growFrom(h0, w0);
-        fadeIn(Array.from(panel.children));
-      }, SWAP_OUT);
+      panel.style.height = '';
+      panel.style.width = '';
+      paintMode(mode);
+      growFrom(h0, w0);
     }
 
     const MODE_OF = {
@@ -3843,6 +3883,7 @@
     };
     sh.querySelectorAll('#bar button, #tl button, #filt, #pg, #homeBtn').forEach(b => {
       b.addEventListener('click', e => {
+        if (b.classList.contains('bstar')) return;
         if (!panelMode) return;
         // 다른 팝업 버튼이면 그대로 넘겨서 열린 팝업 안에서 전환한다
         if (MODE_OF[b.id] && !b.classList.contains('active')) return;
@@ -3871,20 +3912,22 @@
         const t = fxTotal();
         const txt = fxPage() + ' / ' + (t || '?');
         if (!pg || pg.textContent === txt) return;
-        const first = pg.textContent === '- / -';
         pg.textContent = txt;
-        if (!first) { pg.classList.remove('bump'); void pg.offsetWidth; pg.classList.add('bump'); }
       };
       updatePage();
       window.addEventListener('hashchange', updatePage);
       setInterval(updatePage, 1500);
     }
 
-    const star = $('#star');
-    if (star) {
-      star.addEventListener('click', () => {
-        if (!curId) return;
-        openBm(curId, panelMode === 'hist' ? 'hist' : null);
+    const pstars = $('#pstars');
+    if (pstars) {
+      pstars.querySelectorAll('.bstar').forEach(b => {
+        b.addEventListener('click', () => {
+          if (!curId) return;
+          const n = +b.dataset.n;
+          if (panelMode === 'bm' && bmId === curId && bmSetStars) { bmSetStars(n); return; }
+          openBm(curId, panelMode === 'hist' ? 'hist' : null, n);
+        });
       });
     }
 
@@ -4325,6 +4368,8 @@
   }
 
   function endChain() {
+    holdLayer = null;
+    clearTimeout(spinT);
     if (turnWrap) { try { turnWrap.remove(); } catch (e) {} }
     turnWrap = null;
     curLayer = null;
@@ -4361,12 +4406,13 @@
     return { x: m ? m.m41 : 0, s: m && m.a ? m.a : 1, o: parseFloat(cs.opacity) || 0 };
   }
 
-  function leave(layer, side, D) {
+  // 나가는 페이지는 화면 폭만큼 옆으로 밀려 나간다. 들어오는 페이지가 바로 옆에 붙어 같이 움직이므로 겹치지 않는다
+  function leave(layer, side, W) {
     const p = poseOf(layer);
     freezeLayer(layer);
     leaving.add(layer);
     syncActive();
-    slide(layer, p.x, side * D, p.s, 0.92, p.o, 0);
+    slide(layer, p.x, side * W, p.s, p.s, p.o, p.o);
     setTimeout(() => {
       try { layer.remove(); } catch (e) {}
       leaving.delete(layer);
@@ -4383,12 +4429,24 @@
     })), { duration: TURN_DUR, easing: 'linear', fill: 'forwards' });
   }
 
-  function waitPage(gid, files, idx, timeout) {
+  // 미리 받은 파일이 먼저 준비되든, 사이트가 띄운 이미지가 먼저 준비되든 빠른 쪽을 쓴다
+  function waitPage(gid, files, idx, timeout, attrBefore) {
     return new Promise((resolve, reject) => {
       const t0 = performance.now();
       const tryNow = () => {
         const im = preImg.get(idx);
-        if (im && im.complete && im.naturalWidth) { resolve(im); return; }
+        if (im && im.complete && im.naturalWidth) {
+          resolve({ src: im.src, nw: im.naturalWidth, nh: im.naturalHeight });
+          return;
+        }
+        if (attrBefore !== undefined) {
+          const r = findReaderImg();
+          const a = r ? r.getAttribute('src') : null;
+          if (r && a && a !== attrBefore && r.complete && r.naturalWidth) {
+            resolve({ src: r.currentSrc || r.src, nw: r.naturalWidth, nh: r.naturalHeight });
+            return;
+          }
+        }
         if (!preBusy.has(idx) && !preDone.has(idx)) preloadPage(gid, files, idx);
         if (performance.now() - t0 > timeout) { reject(new Error('timeout')); return; }
         setTimeout(tryNow, 16);
@@ -4414,32 +4472,80 @@
     });
   }
 
+  // 다음 페이지가 아직 없을 때 지금 페이지를 붙잡아 두는 레이어 (빈 화면 대신)
+  let holdLayer = null;
+  let spinT = 0;
+  function spinLater(my) {
+    clearTimeout(spinT);
+    spinT = setTimeout(() => {
+      if (my !== turnSeq || !turnWrap || turnWrap.querySelector('.hk-spin')) return;
+      const s = document.createElement('div');
+      s.className = 'hk-spin';
+      turnWrap.appendChild(s);
+    }, 180);
+  }
+  function hideSpin() {
+    clearTimeout(spinT);
+    if (turnWrap) turnWrap.querySelectorAll('.hk-spin').forEach(n => n.remove());
+  }
+
+  function setPx(x) { document.documentElement.style.setProperty('--hk-px', Math.round(x) + 'px'); }
+  let bounceT = 0;
+  function snapPx() {
+    const root = document.documentElement;
+    if (!(parseFloat(root.style.getPropertyValue('--hk-px')) || 0)) return;
+    clearTimeout(bounceT);
+    root.classList.add('hk-zanim');
+    setPx(0);
+    bounceT = setTimeout(() => root.classList.remove('hk-zanim'), 320);
+  }
+  const rubberX = dx => dx / (1 + Math.abs(dx) / (window.innerWidth * 0.3)) * 0.45;
+
+  // 첫 장·마지막 장에서 더 넘기려 하면 살짝 밀렸다 돌아오기만 한다
+  function edgeBounce(dir) {
+    if (zoom > 1.01) return;
+    const side = TURN_FLIP ? -dir : dir;
+    const root = document.documentElement;
+    clearTimeout(bounceT);
+    root.classList.add('hk-zanim');
+    setPx(side * Math.min(56, window.innerWidth * 0.1));
+    bounceT = setTimeout(() => {
+      setPx(0);
+      bounceT = setTimeout(() => root.classList.remove('hk-zanim'), 320);
+    }, 140);
+    press(0, -4);
+  }
+
   function turn(dir) {
     busyFor(TURN_DUR + 120);
     if (zoom > 1.01) resetZoom();
     const total = fxTotal();
     const cur = fxPage();
     const next = cur + dir;
-    if (next < 1 || (total && next > total)) return;
+    if (next < 1 || (total && next > total)) { edgeBounce(dir); return; }
 
     const gid = getCurrentId();
     const files = readerFiles(gid);
     const side = TURN_FLIP ? -dir : dir;
     if (files && next < files.length) preloadPage(gid, files, next);
 
+    let out = curLayer || holdLayer;
+    curLayer = null;
+    holdLayer = null;
+    if (!out && !leaving.size) out = outgoingLayer();
+    if (!out && !leaving.size && !pendingIn) {
+      // 지금 페이지조차 아직 안 떠 있으면 덮개를 씌우지 않고 사이트가 바로 보여주게 둔다
+      ++turnSeq;
+      endChain();
+      location.hash = '#' + next;
+      hlog('넘김', cur, '→', next, '(현재 페이지 로딩 전 · 애니메이션 생략)');
+      return;
+    }
+
     const my = ++turnSeq;
     coverUp();
     ensureWrap();
-    const D = window.innerWidth * TURN_DIST;
-
-    const out = curLayer;
-    curLayer = null;
-    if (out) leave(out, side, D);
-    else if (!leaving.size) {
-      const snap = outgoingLayer();
-      if (snap) leave(snap, side, D);
-    }
-
+    const W = window.innerWidth;
     const realBefore = findReaderImg();
     const attrBefore = realBefore ? realBefore.getAttribute('src') : null;
     markOwn(next);
@@ -4447,18 +4553,25 @@
     pendingIn++;
     syncActive();
 
-    const readyP = files
-      ? waitPage(gid, files, next - 1, 10000).then(im => ({ src: im.src, nw: im.naturalWidth, nh: im.naturalHeight }))
-      : waitRealImg(attrBefore, 10000);
+    const now = files ? pageReady(next - 1) : null;
+    // 다음 장이 아직이면 지금 장을 그 자리에 두고(빈 화면 없음) 받는 대로 넘긴다
+    if (!now && out) { holdLayer = out; spinLater(my); }
+    const readyP = now
+      ? Promise.resolve({ src: now.src, nw: now.naturalWidth, nh: now.naturalHeight })
+      : (files ? waitPage(gid, files, next - 1, 10000, attrBefore) : waitRealImg(attrBefore, 10000));
 
     readyP.then(info => {
       pendingIn--;
       syncActive();
       if (my !== turnSeq) return;
+      hideSpin();
+      if (holdLayer === out) holdLayer = null;
+      let ox = 0;
+      if (out && out.isConnected) { ox = poseOf(out).x; leave(out, side, W); }
       const inL = fitLayer(info.src, info.nw, info.nh);
       ensureWrap().appendChild(inL);
       shown = info;
-      slide(inL, -side * D, 0, dir > 0 ? 1.12 : 0.88, 1, 0, 1);
+      slide(inL, ox - side * W, 0);
       curLayer = inL;
       press(0, 10);
     }).catch(() => {
@@ -4468,11 +4581,11 @@
       hlog('넘김 실패: 새 페이지 대기 시간 초과');
       endChain();
     });
-    hlog('넘김', cur, '→', next, preDone.has(next - 1) ? '(미리 받은 파일 사용)' : '(미리 받지 않음 · 사이트 로딩 대기)');
+    hlog('넘김', cur, '→', next, now ? '(미리 받은 파일 사용)' : '(받는 중 · 현재 페이지를 붙잡아 둠)');
   }
 
-  const drag = { id: null, x0: 0, y0: 0, px0: 0, py0: 0, mode: 0, dir: 0, dx: 0, lastX: 0, lastT: 0, v: 0,
-    outL: null, inL: null, info: null, next: 0, files: null };
+  const drag = { id: null, x0: 0, y0: 0, px0: 0, py0: 0, mode: 0, dir: 0, dx: 0, ox: 0, lastX: 0, lastT: 0, v: 0,
+    outL: null, inL: null, info: null, next: 0, files: null, edge: false };
   const pts = new Map();
   let pinch = null;
 
@@ -4481,106 +4594,123 @@
     return im && im.complete && im.naturalWidth ? im : null;
   }
 
+  function dragAddIn() {
+    if (drag.inL || !drag.files) return;
+    const im = pageReady(drag.next - 1);
+    if (!im) return;
+    drag.info = { src: im.src, nw: im.naturalWidth, nh: im.naturalHeight };
+    drag.inL = fitLayer(drag.info.src, drag.info.nw, drag.info.nh);
+    setPx(0);
+    coverUp();
+    ensureWrap().appendChild(drag.inL);
+  }
+
   function dragBegin(dir) {
     const total = fxTotal();
-    const cur = fxPage();
-    const next = cur + dir;
-    const valid = !(next < 1 || (total && next > total));
-    const gid = getCurrentId();
-    const files = readerFiles(gid);
-
+    const next = fxPage() + dir;
     drag.dir = dir;
     drag.next = next;
-    ++turnSeq;
-    coverUp();
-    ensureWrap();
-    drag.outL = curLayer ? freezeLayer(curLayer) : (leaving.size ? null : outgoingLayer());
+    drag.edge = next < 1 || !!(total && next > total);
+    drag.outL = null;
     drag.inL = null;
     drag.info = null;
-    drag.files = valid && files ? files : null;
-    if (valid && files) {
-      if (next < files.length) preloadPage(gid, files, next);
-      const im = pageReady(next - 1);
-      if (im) {
-        drag.info = { src: im.src, nw: im.naturalWidth, nh: im.naturalHeight };
-        drag.inL = fitLayer(drag.info.src, drag.info.nw, drag.info.nh);
-        ensureWrap().appendChild(drag.inL);
-      }
-    }
+    drag.files = null;
+    drag.ox = 0;
+    if (drag.edge) return;
+
+    const gid = getCurrentId();
+    const files = readerFiles(gid);
+    ++turnSeq;
+    hideSpin();
+    const base = curLayer || holdLayer;
+    curLayer = null;
+    holdLayer = null;
+    if (base) { drag.ox = poseOf(base).x; drag.outL = freezeLayer(base); }
+    else if (!leaving.size) drag.outL = outgoingLayer();
+    if (drag.outL) coverUp();
+    drag.files = files || null;
+    if (files && next < files.length) preloadPage(gid, files, next);
+    dragAddIn();
   }
 
-  function dragLook(dx) {
-    const p = Math.min(1, Math.abs(dx) / window.innerWidth);
-    const s0 = drag.dir > 0 ? 1.12 : 0.88;
-    return { sOut: 1 - 0.08 * p, oOut: 1 - 0.6 * p, sIn: s0 + (1 - s0) * p, oIn: p };
-  }
-
+  // 손가락을 1:1로 따라가고, 들어오는 페이지는 화면 폭만큼 떨어진 바로 옆에 붙어 있다
   function dragMove(dx) {
     const W = window.innerWidth;
     busyFor(160);
-    if (!drag.inL && drag.files) {
-      const im = pageReady(drag.next - 1);
-      if (im) {
-        drag.info = { src: im.src, nw: im.naturalWidth, nh: im.naturalHeight };
-        drag.inL = fitLayer(drag.info.src, drag.info.nw, drag.info.nh);
-        ensureWrap().appendChild(drag.inL);
-      }
+    if (drag.edge) { setPx(rubberX(dx)); return; }
+    dragAddIn();
+    const x = drag.ox + dx;
+    if (drag.outL) {
+      drag.outL.style.transform = `translate3d(${x.toFixed(1)}px,0,0)`;
+      drag.outL.style.opacity = '1';
     }
-    const k = dragLook(dx);
     if (drag.inL) {
-      if (drag.outL) {
-        drag.outL.style.transform = `translate3d(${dx.toFixed(1)}px,0,0) scale(${k.sOut.toFixed(4)})`;
-        drag.outL.style.opacity = k.oOut.toFixed(3);
-      }
-      drag.inL.style.transform = `translate3d(${(dx - drag.dir * W).toFixed(1)}px,0,0) scale(${k.sIn.toFixed(4)})`;
-      drag.inL.style.opacity = k.oIn.toFixed(3);
-    } else if (drag.outL) {
-      drag.outL.style.transform = `translate3d(${(dx * 0.35).toFixed(1)}px,0,0)`;
+      drag.inL.style.transform = `translate3d(${(x - drag.dir * W).toFixed(1)}px,0,0)`;
+      drag.inL.style.opacity = '1';
     }
+    if (!drag.outL && !drag.inL) setPx(rubberX(dx));
   }
 
-  function dragSnap(dx) {
+  function dragSnap() {
     busyFor(TURN_DUR + 120);
-    const W = window.innerWidth, d = drag.dir;
-    const k = dragLook(dx);
-    if (drag.outL) {
-      slide(drag.outL, dx, 0, k.sOut, 1, k.oOut, 1);
-      curLayer = drag.outL;
+    snapPx();
+    if (drag.edge) return;
+    const W = window.innerWidth, d = drag.dir, my = turnSeq;
+    const ol = drag.outL, il = drag.inL;
+    drag.outL = null;
+    drag.inL = null;
+    if (ol) {
+      const p = poseOf(ol);
+      slide(ol, p.x, 0);
+      curLayer = ol;
     }
-    if (drag.inL) {
-      const s0 = d > 0 ? 1.12 : 0.88;
-      slide(drag.inL, dx - d * W, -d * W, k.sIn, s0, k.oIn, 0);
-      const il = drag.inL;
+    if (il) {
+      const p = poseOf(il);
+      slide(il, p.x, -d * W);
       setTimeout(() => { try { il.remove(); } catch (e) {} }, TURN_DUR + 40);
     }
-    if (!drag.outL && !curLayer && !drag.inL) endChain();
+    if (!ol) {
+      setTimeout(() => {
+        if (my === turnSeq && !curLayer && !holdLayer && !leaving.size && !pendingIn) endChain();
+      }, TURN_DUR + 60);
+    }
   }
 
-  function dragCommit(dx) {
+  function dragCommit() {
     busyFor(TURN_DUR + 120);
     const W = window.innerWidth, d = drag.dir;
-    const k = dragLook(dx);
+    const ol = drag.outL, il = drag.inL;
+    drag.outL = null;
+    drag.inL = null;
     markOwn(drag.next);
     location.hash = '#' + drag.next;
-    if (drag.outL) {
-      slide(drag.outL, dx, d * W, k.sOut, 0.92, k.oOut, 0);
-      const ol = drag.outL;
-      setTimeout(() => { try { ol.remove(); } catch (e) {} }, TURN_DUR + 40);
+    const pi = poseOf(il);
+    if (ol) {
+      const po = poseOf(ol);
+      leaving.add(ol);
+      syncActive();
+      slide(ol, po.x, d * W);
+      setTimeout(() => {
+        try { ol.remove(); } catch (e) {}
+        leaving.delete(ol);
+        syncActive();
+      }, TURN_DUR + 40);
     }
-    slide(drag.inL, dx - d * W, 0, k.sIn, 1, k.oIn, 1);
+    slide(il, pi.x, 0);
     shown = drag.info;
-    curLayer = drag.inL;
+    curLayer = il;
     press(0, 10);
   }
 
   function dragEnd(dx, v) {
     const W = window.innerWidth, d = drag.dir;
+    if (drag.edge) { dragSnap(); press(0, -4); return; }
     const progress = dx * d;
     const flick = v * d > 0.3 && progress > 6;
     const want = progress > W * DRAG_CUT || flick;
-    if (!want) { dragSnap(dx); press(0, -4); return; }
-    if (!drag.inL) { dragSnap(dx); turn(d); return; }
-    dragCommit(dx);
+    if (!want) { dragSnap(); press(0, -4); return; }
+    if (!drag.inL) { dragSnap(); turn(d); return; }
+    dragCommit();
   }
 
   function settleZoom() {
@@ -4983,7 +5113,7 @@
     if (window.__hkEdges) window.__hkEdges();
   }
 
-  const OURS_SEL = '#hk-host, #hk-fx-ov, #hk-cover, #hk-sentinel, #hk-bg, #hk-empty, .hk-zoom, .hk-wrap, .hk-card-host';
+  const OURS_SEL = '#hk-host, #hk-fx-ov, #hk-cover, #hk-sentinel, #hk-bg, #hk-empty, .hk-zoom, .hk-wrap, .hk-card-host, .hk-meta-host';
   const isOursNode = n => !!(n && n.nodeType === 1 && n.closest && n.closest(OURS_SEL));
   const observer = new MutationObserver(muts => {
     if (runT) return;
@@ -5021,7 +5151,7 @@
     t.textContent = (q ? '"' + q + '"' : '검색어') + ' 에 대한 작품이 없습니다';
     const s = document.createElement('div');
     s.style.cssText = 'font-size:12.5px!important;color:#8a8a95!important;';
-    s.textContent = '왼쪽 아래 H 버튼으로 히토미 홈이나 이전 목록으로 갈 수 있습니다.';
+    s.textContent = '오른쪽 아래 H 버튼으로 히토미 홈이나 이전 목록으로 갈 수 있습니다.';
     box.append(t, s);
     document.documentElement.appendChild(box);
   }
