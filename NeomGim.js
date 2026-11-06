@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.5.0
+// @version      1.6.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.5.0';
+  const VERSION = '1.6.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -79,7 +79,6 @@
     infinite: true,
     preload: true,
     mergeTitles: true,
-    typeFx: true,
     jSort: 'date',
   };
   const settings = Object.assign({}, SETTING_DEFAULTS, store.get(KEY.settings, {}));
@@ -466,19 +465,10 @@
       font-size: 13px; line-height: 1.3; letter-spacing: -0.01em; color: var(--text);
     }
 
-    #root.busy .pill, #root.busy .glass { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
     .pill {
-      background: rgba(24, 24, 28, 0.5);
-      -webkit-backdrop-filter: blur(12px) saturate(120%);
-      backdrop-filter: blur(12px) saturate(120%);
-      border: 1px solid rgba(255, 255, 255, 0.26);
+      background: rgba(26, 26, 30, 0.84);
+      border: 1px solid rgba(255, 255, 255, 0.22);
       box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
-    }
-    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-      .pill { background: rgba(28, 28, 32, 0.94); }
-    }
-    @media (hover: none), (pointer: coarse) {
-      .pill { background: rgba(24, 24, 28, 0.5); }
     }
 
     @keyframes hkBarIn {
@@ -574,7 +564,6 @@
     .filt svg { display: block; width: 16px; height: 16px; opacity: .85; }
     .filt .fl { white-space: nowrap; }
     .filt.active { color: #fff; }
-    .hk-ch { display: inline-block; animation: hkCh .6s cubic-bezier(.22, 1, .36, 1) backwards; }
     @keyframes hkCh { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
     .hlk { font-size: 13px; font-weight: 700; color: #fff; margin-top: 12px; }
     .hld { font-size: 12px; color: var(--sub); line-height: 1.5; margin-top: 3px; }
@@ -586,7 +575,7 @@
       max-height: min(72vh, 600px); overflow-y: auto;
       transition: max-height .3s var(--ease);
       scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .28) transparent;
-      background: rgba(24, 24, 28, 0.55) !important;
+      background: rgba(26, 26, 30, 0.9) !important;
       transform-origin: 100% 100%; will-change: transform, opacity;
     }
     .panel.open, .toast.open { display: block; }
@@ -596,6 +585,15 @@
       padding: 9px 16px; border-radius: 999px; color: #fff; white-space: nowrap;
       background: rgba(24, 24, 28, 0.92) !important;
     }
+    .toast.has-act { padding: 5px 5px 5px 16px; }
+    .toast .tmsg { vertical-align: middle; }
+    .toast .tact {
+      -webkit-appearance: none; appearance: none; cursor: pointer; vertical-align: middle;
+      height: 30px; margin-left: 12px; padding: 0 14px; border-radius: 999px; border: 0;
+      background: rgba(255, 255, 255, 0.92); color: #14161a; font: inherit; font-size: 12.5px; font-weight: 700;
+      transition: transform .3s var(--ease);
+    }
+    .toast .tact:active { transform: scale(.9); transition-duration: .1s; }
     .panel.mini { width: auto; min-width: 220px; padding: 14px 16px; }
     .panel.mini .val { margin-bottom: 10px; }
 
@@ -630,17 +628,14 @@
       position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 1;
       border-radius: 26px; pointer-events: none;
       background: rgba(0, 0, 0, 0);
-      -webkit-backdrop-filter: blur(10px) saturate(120%);
-      backdrop-filter: blur(10px) saturate(120%);
       visibility: hidden; opacity: 0;
     }
     .hfix {
       position: relative; flex: none;
       width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      background: rgba(24, 24, 28, 0.7); color: var(--text);
-      -webkit-backdrop-filter: blur(12px) saturate(120%); backdrop-filter: blur(12px) saturate(120%);
-      border: 1px solid rgba(255, 255, 255, 0.26);
+      background: rgba(26, 26, 30, 0.84); color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.22);
       box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
       transition: transform .22s var(--ease), background .22s var(--ease);
     }
@@ -652,19 +647,28 @@
     .glass { display: none !important; }
     .glass.on { visibility: visible; opacity: 1; }
 
-    .tgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .tgrid { display: flex; flex-direction: column; gap: 6px; }
     .tog {
-      display: flex; align-items: center; justify-content: center; min-height: 46px;
-      padding: 10px 8px; border-radius: 14px; text-align: center;
+      position: relative; display: flex; align-items: center; justify-content: flex-start;
+      min-height: 46px; padding: 0 64px 0 18px; border-radius: 999px; text-align: left;
       background: rgba(255, 255, 255, 0.08); color: var(--sub);
-      font-size: 12.5px; font-weight: 600; cursor: pointer; user-select: none;
-      transition: background .25s var(--ease), color .25s var(--ease), transform .2s var(--ease);
+      font-size: 13px; font-weight: 600; cursor: pointer; user-select: none;
+      transition: background .25s var(--ease), color .25s var(--ease), transform .3s var(--ease);
     }
-    .tog:active { transform: scale(.96); }
-    .tog.on {
-      background: rgba(255, 255, 255, 0.22); color: #fff;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+    .tog::after {
+      content: ''; position: absolute; right: 8px; top: 50%; width: 44px; height: 26px; margin-top: -13px;
+      border-radius: 999px; background: rgba(255, 255, 255, 0.16);
+      transition: background .25s var(--ease);
     }
+    .tog::before {
+      content: ''; position: absolute; right: 29px; top: 50%; width: 20px; height: 20px; margin-top: -10px; z-index: 1;
+      border-radius: 50%; background: rgba(255, 255, 255, 0.75); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+      transition: transform .3s var(--ease), background .25s var(--ease);
+    }
+    .tog:active { transform: scale(.98); transition-duration: .1s; }
+    .tog.on { background: rgba(255, 255, 255, 0.16); color: #fff; }
+    .tog.on::after { background: #9fe0a8; }
+    .tog.on::before { transform: translateX(18px); background: #fff; }
 
     .sgl { margin-top: 8px; }
     .sgl:empty { margin-top: 0; }
@@ -2661,47 +2665,26 @@
     }
 
     let toastTimer = 0;
-    function setChars(node, text) {
-      node.textContent = '';
-      const chars = Array.from(text);
-      // 글자가 많을수록 간격을 줄여서 전체 등장 시간이 300ms 안팎이 되게 한다
-      const step = chars.length > 1 ? Math.min(35, 300 / (chars.length - 1)) : 0;
-      chars.forEach((ch, i) => {
-        const s = document.createElement('span');
-        s.className = 'hk-ch';
-        s.style.animationDelay = Math.round(140 + i * step) + 'ms';
-        s.textContent = ch === ' ' ? '\u00a0' : ch;
-        node.appendChild(s);
-      });
-    }
-
-    function animateText(node) {
-      if (!settings.typeFx || !node || node.nodeType !== 1) return;
-      const list = [node].concat(Array.from(node.querySelectorAll('*')));
-      // 카드 목록·칩·긴 글은 글자를 쪼개지 않는다 (요소 수천 개가 동시에 움직이면 프레임이 떨어짐)
-      let budget = 400;
-      list.forEach(e => {
-        if (e.dataset.fx || e.classList.contains('hk-ch')) return;
-        if (e.children.length || /^(INPUT|TEXTAREA|SCRIPT|STYLE|PRE)$/.test(e.tagName)) return;
-        const len = e.textContent.trim().length;
-        if (!len || len > 80 || len > budget) return;
-        if (e.closest('.list, .chips, .pvgrid, .diag, .tfl, .jbar')) return;
-        budget -= len;
-        e.dataset.fx = '1';
-        setChars(e, e.textContent);
-      });
-    }
-    new MutationObserver(muts => {
-      muts.forEach(m => m.addedNodes.forEach(n => animateText(n)));
-    }).observe(panel, { childList: true, subtree: true });
-
-    function toast(msg) {
+    // act: { label, fn } 를 주면 토스트 오른쪽에 버튼이 붙고 조금 더 오래 떠 있다
+    function toast(msg, act) {
       const t = $('#toast');
-      if (settings.typeFx) setChars(t, msg);
-      else t.textContent = msg;
+      t.textContent = '';
+      t.appendChild(el('span', 'tmsg', msg));
+      if (act) {
+        const b = el('button', 'tact', act.label);
+        b.type = 'button';
+        b.addEventListener('click', e => {
+          e.stopPropagation();
+          clearTimeout(toastTimer);
+          popClose(t, null);
+          act.fn();
+        });
+        t.appendChild(b);
+      }
+      t.classList.toggle('has-act', !!act);
       popOpen(t, null);
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => popClose(t, null), 1600);
+      toastTimer = setTimeout(() => popClose(t, null), act ? 4500 : 1600);
     }
 
     function updateCounts() {
@@ -3078,6 +3061,7 @@
       }
       items.forEach(s => {
         const row = el('div', 'item');
+        row.dataset.id = s.id;
         const info = el('div', 'info');
         info.title = '클릭: 열기';
         const dt = el('div', 'dt');
@@ -3103,11 +3087,21 @@
         del.addEventListener('click', e => {
           e.stopPropagation();
           askCardDelete(tb, '일지를 삭제할까요?', () => removeCard(row, () => {
+            const idx = saved.findIndex(x => x.id === s.id);
+            const item = savedOf(s.id);
             removeSaved(s.id);
             updateCounts();
             const cnt = panel.querySelector('#jcount');
             if (cnt) cnt.textContent = '일지 ' + saved.length + '개';
             if (!saved.length) renderItems();
+            if (!item) return;
+            toast('일지를 삭제했습니다', { label: '되돌리기', fn: () => {
+              if (isSaved(item.id)) return;
+              saved.splice(Math.max(0, Math.min(idx, saved.length)), 0, item);
+              saveList();
+              updateCounts();
+              if (panelMode === 'hist' && histMode === 'saved') reflowList('#items', renderItems, item.id);
+            } });
           }));
         });
         fl.append(tid, del);
@@ -3115,6 +3109,28 @@
         acts.append(iconBtn(ICON.edit, '일지 수정', () => openBm(s.id, 'hist')));
         row.append(tb, foot, acts);
         box.appendChild(row);
+      });
+    }
+
+    // 목록을 다시 그리면서, 기존 카드는 원래 자리에서 미끄러지고 되돌린 카드는 커지며 나타나게 한다
+    function reflowList(sel, render, newId) {
+      const box = panel.querySelector(sel);
+      if (!box) return;
+      const first = new Map();
+      Array.from(box.children).forEach(c => { if (c.dataset.id) first.set(c.dataset.id, c.getBoundingClientRect()); });
+      render();
+      Array.from(box.children).forEach(c => {
+        if (!c.animate) return;
+        const f = first.get(c.dataset.id);
+        if (c.dataset.id === newId || !f) {
+          c.animate([{ opacity: 0, transform: 'scale(.82)' }, { opacity: 1, transform: 'none' }],
+            { duration: 340, easing: SWAP_EASE });
+          return;
+        }
+        const l = c.getBoundingClientRect();
+        const dx = f.left - l.left, dy = f.top - l.top;
+        if (dx || dy) c.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+          { duration: 420, easing: SWAP_EASE });
       });
     }
 
@@ -3180,6 +3196,7 @@
       }
       items.forEach(w => {
         const row = el('div', 'item');
+        row.dataset.id = w.id;
         const info = el('div', 'info');
         info.title = '클릭: 열기';
         info.append(
@@ -3196,9 +3213,18 @@
         del.addEventListener('click', e => {
           e.stopPropagation();
           askCardDelete(tb, '기록을 삭제할까요?', () => removeCard(row, () => {
+            const idx = watched.findIndex(x => x.id === w.id);
+            const item = idx >= 0 ? watched[idx] : null;
             watched = watched.filter(x => x.id !== w.id);
             saveWatched();
             if (!watched.length) renderHistItems();
+            if (!item) return;
+            toast('기록을 삭제했습니다', { label: '되돌리기', fn: () => {
+              if (watched.some(x => x.id === item.id)) return;
+              watched.splice(Math.max(0, Math.min(idx, watched.length)), 0, item);
+              saveWatched();
+              if (panelMode === 'hist' && histMode === 'recent') reflowList('#hitems', renderHistItems, item.id);
+            } });
           }));
         });
         tb.appendChild(del);
@@ -3351,8 +3377,7 @@
       [
         ['preload', 'Pre Load'],
         ['koreanOnly', 'Only Korean'],
-        ['infinite', 'Unlimited scroll'],
-        ['typeFx', '글자 등장 효과']
+        ['infinite', 'Unlimited scroll']
       ].forEach(([key, label]) => {
         const t = el('div', 'tog' + (settings[key] ? ' on' : ''), label);
         t.setAttribute('role', 'switch');
