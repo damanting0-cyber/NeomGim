@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.2.2
+// @version      1.3.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.2.2';
+  const VERSION = '1.3.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -35,7 +35,6 @@
     saved: 'hk_saved',
     settings: 'hk_settings',
     watched: 'hk_watch',
-    blocked: 'hk_block',
     thumbs: 'hk_thumbs',
     hist: 'hk_hist',
     terms: 'hk_terms',
@@ -78,10 +77,11 @@
     cardStyle: true,
     koreanTitle: true,
     infinite: true,
-    blockTags: true,
     preload: true,
     mergeTitles: true,
     typeFx: true,
+    browseMin: 4,
+    jSort: 'date',
   };
   const settings = Object.assign({}, SETTING_DEFAULTS, store.get(KEY.settings, {}));
   const saveSettings = () => store.set(KEY.settings, settings);
@@ -146,24 +146,32 @@
   let watched = store.get(KEY.watched, []);
   const saveWatched = () => store.set(KEY.watched, watched);
 
-  let blocked = store.get(KEY.blocked, []);
-  const saveBlocked = () => store.set(KEY.blocked, blocked);
-
   let thumbs = store.get(KEY.thumbs, {});
+  let thumbsCount = Object.keys(thumbs).length;
   let thumbsDirty = false;
   function setThumb(id, url) {
     if (!id || !url || /^data:/.test(url)) return;
     if (url.indexOf('//') === 0) url = 'https:' + url;
+    id = String(id);
     if (thumbs[id] === url) return;
+    if (!(id in thumbs)) thumbsCount++;
     thumbs[id] = url;
     thumbsDirty = true;
-    const keys = Object.keys(thumbs);
-    if (keys.length > 1500) { const k = keys.find(x => x !== String(id)); if (k) delete thumbs[k]; }
+    if (thumbsCount > 1500) {
+      for (const k in thumbs) { if (k !== id) { delete thumbs[k]; thumbsCount--; break; } }
+    }
   }
-  function flushThumbs() {
+  let thumbsTimer = 0;
+  function writeThumbs() {
+    clearTimeout(thumbsTimer);
+    thumbsTimer = 0;
     if (!thumbsDirty) return;
     thumbsDirty = false;
     store.set(KEY.thumbs, thumbs);
+  }
+  function flushThumbs() {
+    if (thumbsTimer || !thumbsDirty) return;
+    thumbsTimer = setTimeout(writeThumbs, 700);
   }
 
   const terms = store.get(KEY.terms, []);
@@ -177,10 +185,17 @@
     if (terms.length > 800) termSet.delete(terms.shift());
     termsDirty = true;
   }
-  function flushTerms() {
+  let termsTimer = 0;
+  function writeTerms() {
+    clearTimeout(termsTimer);
+    termsTimer = 0;
     if (!termsDirty) return;
     termsDirty = false;
     store.set(KEY.terms, terms);
+  }
+  function flushTerms() {
+    if (termsTimer || !termsDirty) return;
+    termsTimer = setTimeout(writeTerms, 700);
   }
 
   let hist = store.get(KEY.hist, []);
@@ -190,19 +205,25 @@
   }
 
   const dates = store.get(KEY.dates, {});
+  let datesCount = Object.keys(dates).length;
   let dateTimer = 0;
   function setDate(id, d) {
-    if (!id || !d || dates[id] === d) return;
+    if (!id || !d) return;
+    id = String(id);
+    if (dates[id] === d) return;
+    if (!(id in dates)) datesCount++;
     dates[id] = d;
     paintDate(id);
-    const keys = Object.keys(dates);
-    if (keys.length > 1500) { const k = keys.find(x => x !== String(id)); if (k) delete dates[k]; }
+    if (datesCount > 1500) {
+      for (const k in dates) { if (k !== id) { delete dates[k]; datesCount--; break; } }
+    }
     clearTimeout(dateTimer);
     dateTimer = setTimeout(flushDates, 800);
   }
   const dateQ = { q: [], seen: new Set(), active: 0 };
   function wantDate(id) {
     if (!id || dates[id] || dateQ.seen.has(String(id))) return;
+    if (dateQ.seen.size > 4000) dateQ.seen.clear();
     dateQ.seen.add(String(id));
     dateQ.q.push(String(id));
     pumpDate();
@@ -245,10 +266,10 @@
   }
 
   function paintDate(id) {
-    document.querySelectorAll('.hk-card-host').forEach(h => {
-      if (h.dataset.hkId !== String(id)) return;
+    const key = String(id);
+    document.querySelectorAll('.hk-card-host[data-hk-id="' + key + '"]').forEach(h => {
       const d = h.shadowRoot && h.shadowRoot.querySelector('.dline');
-      if (d) d.textContent = dates[id] || '';
+      if (d) d.textContent = dates[key] || '';
     });
   }
   function noteDate(id, raw) {
@@ -257,7 +278,10 @@
     setDate(id, fmtDate(m));
   }
   function flushDates() { clearTimeout(dateTimer); store.set(KEY.dates, dates); }
-  window.addEventListener('pagehide', () => { flushDates(); flushThumbs(); flushTerms(); });
+  window.addEventListener('pagehide', () => { flushDates(); writeThumbs(); writeTerms(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { flushDates(); writeThumbs(); writeTerms(); }
+  });
 
   const LIST_BG_CSS = IS_WORK_PAGE ? '' : 'html, body { background-color: #111111 !important; }';
 
@@ -270,7 +294,7 @@
     #search-button, button#search, .search-button, input[type="submit"][value="Search" i] { display: none !important; }
     .search-content, #search-content, #search-form, .search-bar, #search-box,
     .search-box, #query-input, #search-options { display: none !important; }
-    .gallery-content > div.hk-hidden, .gallery-content > div.hk-blocked, .gallery-content > div.hk-merged { display: none !important; }
+    .gallery-content > div.hk-hidden, .gallery-content > div.hk-artsoff, .gallery-content > div.hk-merged { display: none !important; }
     .gallery-content > .hk-stray { display: none !important; }
     .hk-vanish { display: none !important; }
     ${settings.infinite ? 'html:not(.hk-pager-on) .page-container { display: none !important; }' : ''}
@@ -365,11 +389,21 @@
     .grplist .d { color: rgba(255, 255, 255, 0.6); font-size: 10.5px; }
     .info {
       position: absolute; left: 0; right: 0; bottom: 0;
-      padding: 10px 12px 11px; cursor: pointer;
+      padding: 10px 34px 11px 12px; cursor: pointer;
       border-radius: 0 0 17px 17px;
       background: #d9dce3;
       transition: padding .3s ease;
     }
+    .dots {
+      position: absolute; right: 6px; bottom: 6px; z-index: 6;
+      width: 24px; height: 24px; padding: 0; border-radius: 50%; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid rgba(255, 255, 255, 0.38); background: rgba(20, 20, 26, 0.72);
+      color: #fff; font: 700 15px/1 -apple-system, 'Malgun Gothic', sans-serif;
+      letter-spacing: .5px; transition: background .2s ease, transform .2s ease;
+    }
+    .dots:hover { background: rgba(20, 20, 26, 0.92); }
+    .dots:active { transform: scale(.9); }
     .title a {
       display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       color: #000; text-decoration: none;
@@ -385,10 +419,27 @@
     }
     @keyframes seenIn { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
     @media (min-width: 521px) {
-      .info { padding: 10px 14px 12px; }
+      .info { padding: 10px 34px 12px 14px; }
       .title a { font-size: 14.5px; }
     }
   `;
+
+  const CARD_HTML = `
+    <div class="card">
+      <a class="thumb"></a>
+      <button class="grp" type="button" style="display:none"></button>
+      <div class="grplist" style="display:none"></div>
+      <div class="info">
+        <div class="title"><a></a></div>
+        <div class="dline"></div>
+      </div>
+      <button class="dots" type="button" title="태그 · 작가 보기">⋯</button>
+    </div>`;
+  let cardSheet = null;
+  try {
+    cardSheet = new CSSStyleSheet();
+    cardSheet.replaceSync(CARD_CSS);
+  } catch (e) { cardSheet = null; }
 
   const PANEL_CSS = `
     :host { all: initial; }
@@ -479,11 +530,11 @@
     .ib.active { background: rgba(255, 255, 255, 0.20); color: #fff; }
     .ib.gear:active svg { transform: rotate(60deg); }
     .ib.pin.on { color: #ffd54a; }
-    .ib.pin.on svg path { fill: currentColor; }
+    .ib.pin.on svg .jb { fill: currentColor; fill-opacity: .28; }
 
     .bar {
       display: flex; align-items: center; gap: 2px;
-      height: calc(52px - 16px * var(--c, 0)); padding: 0 6px; border-radius: 999px;
+      height: 52px; padding: 0 6px; border-radius: 999px;
       animation: hkBarIn .7s var(--ease) .1s backwards;
     }
     .bar, .filt, .tl {
@@ -503,7 +554,7 @@
     .filt {
       -webkit-appearance: none; appearance: none; border: 1px solid rgba(255, 255, 255, 0.26); flex: none; cursor: pointer;
       display: inline-flex; align-items: center; gap: 7px;
-      height: calc(44px - 8px * var(--c, 0)); padding: 0 15px 0 13px; border-radius: 999px;
+      height: 44px; padding: 0 15px 0 13px; border-radius: 999px;
       color: var(--text); font: inherit; font-size: 12.5px; font-weight: 700;
       animation: hkBarIn .7s var(--ease) .12s backwards;
       transition: color .2s var(--ease);
@@ -676,6 +727,42 @@
     .segb:hover { color: #fff; }
     .segb { white-space: nowrap; padding: 0 14px; }
     .segb.on { background: rgba(255, 255, 255, 0.20); color: #fff; }
+    .seg { position: relative; }
+    .segb { position: relative; z-index: 1; }
+    .segi {
+      position: absolute; left: 0; top: 4px; bottom: 4px; width: 0; z-index: 0;
+      border-radius: 999px; background: rgba(255, 255, 255, 0.20); pointer-events: none;
+      opacity: 0; transition: transform .42s var(--ease), width .42s var(--ease);
+    }
+    .seg.slide .segi { opacity: 1; }
+    .seg.slide .segb.on { background: none; }
+    .seg.noanim .segi { transition: none; }
+    .seg.sm { margin: 0; padding: 3px; gap: 2px; }
+    .seg.sm .segi { top: 3px; bottom: 3px; }
+    .seg.sm .segb { height: 26px; padding: 0 11px; font-size: 11.5px; }
+    .jbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
+    .jbar .jn { color: var(--sub); font-size: 11.5px; font-weight: 600; padding-left: 4px; }
+    .tfl {
+      position: absolute; left: 6px; right: 6px; bottom: 6px; z-index: 2;
+      display: flex; align-items: center; gap: 4px; height: 28px; padding: 0 3px 0 10px;
+      border-radius: 999px; background: rgba(20, 20, 26, 0.5);
+      -webkit-backdrop-filter: blur(10px) saturate(130%); backdrop-filter: blur(10px) saturate(130%);
+      border: 1px solid rgba(255, 255, 255, 0.24); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+      transition: transform .3s var(--ease);
+    }
+    .item:hover .tfl { transform: translateY(-2px); }
+    .tfl .tid {
+      flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: #fff; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: left;
+    }
+    .tfl .tx {
+      -webkit-appearance: none; appearance: none; flex: none; border: 0; padding: 0; cursor: pointer;
+      width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.14);
+      color: #fff; font-size: 11px; line-height: 22px; text-align: center; transition: background .2s ease;
+    }
+    .tfl .tx:hover { background: rgba(255, 90, 90, 0.85); }
+    .ibs.on { color: #ffd54a; background: rgba(255, 213, 74, 0.16); border-color: rgba(255, 213, 74, 0.45); }
+    .tog.inl { min-height: 40px; margin-top: 10px; }
 
     .row { display: flex; align-items: center; gap: 6px; }
     .row + .row, .row + .list, .lbl + .row, .row + .lbl, .hint + .lbl { margin-top: 8px; }
@@ -799,7 +886,7 @@
 
     @media (max-width: 520px) {
       .wrap { right: 10px; bottom: 10px; gap: 10px; }
-      .bar { height: calc(48px - 12px * var(--c, 0)); }
+      .bar { height: 48px; }
       .tl { height: 40px; }
       .cur { font-size: 14px; padding-left: 12px; }
       .ib { width: 36px; height: 36px; }
@@ -868,8 +955,7 @@
       width: auto !important; height: auto !important;
       max-width: var(--hk-vw, 100%) !important; max-height: var(--hk-vh, 100%) !important;
       margin: 0 !important; object-fit: contain !important;
-      transform: translate(calc(var(--hk-dx, 0px) + var(--hk-px, 0px)),
-                           calc(var(--hk-dy, 0px) + var(--hk-py, 0px)))
+      transform: translate(var(--hk-px, 0px), var(--hk-py, 0px))
                  scale(var(--hk-z, 1)) !important;
       transform-origin: 50% 50% !important;
     }
@@ -998,24 +1084,51 @@
     return box;
   }
 
-  function addSaved(id, title, alias, stars) {
+  function addSaved(id, title, alias, stars, arts, pick) {
     if (isSaved(id)) return false;
     saved.unshift({
       id, title: title || '', alias: alias || '',
       stars: Math.max(0, Math.min(5, Math.round(+stars || 0))),
+      arts: Array.isArray(arts) ? arts.slice(0, 16) : [],
+      pick: !!pick,
       ts: Date.now()
     });
     saveList();
     return true;
   }
 
-  function updateSaved(id, alias, stars) {
+  function updateSaved(id, alias, stars, arts, pick) {
     const it = savedOf(id);
     if (!it) return false;
     it.alias = alias || '';
     it.stars = Math.max(0, Math.min(5, Math.round(+stars || 0)));
+    if (pick != null) it.pick = !!pick;
+    if (Array.isArray(arts) && arts.length) it.arts = arts.slice(0, 16);
     saveList();
     return true;
+  }
+
+  function pageArtists(id) {
+    const out = [];
+    const push = v => {
+      const s = String(v || '').replace(/_/g, ' ').trim();
+      if (s && out.indexOf(s) < 0) out.push(s);
+    };
+    try {
+      const g = W().galleryinfo;
+      if (g && (!id || String(g.id) === String(id))) {
+        (g.artists || []).forEach(a => a && push(a.artist));
+      }
+    } catch (e) {}
+    if (!out.length) {
+      document.querySelectorAll('a[href^="/artist/"]').forEach(a => {
+        if (a.closest('.gallery-content')) return;
+        const m = (a.getAttribute('href') || '').match(/^\/artist\/(.+)-[a-z]+\.html/i);
+        if (!m) return;
+        try { push(decodeURIComponent(m[1])); } catch (e) {}
+      });
+    }
+    return out;
   }
 
   function removeSaved(id) {
@@ -1067,11 +1180,11 @@
   }
 
   const SORTS = [
-    ['date', 'Date Published', `/index-${LANG}.html`],
-    ['today', 'Popular: Today', `/popular/today-${LANG}.html`],
-    ['week', 'Popular: Week', `/popular/week-${LANG}.html`],
-    ['month', 'Popular: Month', `/popular/month-${LANG}.html`],
-    ['year', 'Popular: Year', `/popular/year-${LANG}.html`]
+    ['date', `/index-${LANG}.html`],
+    ['today', `/popular/today-${LANG}.html`],
+    ['week', `/popular/week-${LANG}.html`],
+    ['month', `/popular/month-${LANG}.html`],
+    ['year', `/popular/year-${LANG}.html`]
   ];
   const SORT_KR = { date: '최신', today: '일간 인기', week: '주간 인기', month: '월간 인기', year: '연간 인기' };
 
@@ -1162,14 +1275,11 @@
   }
 
   function rewriteLinks(root) {
-    root.querySelectorAll('a[href]').forEach(a => {
+    root.querySelectorAll('a[href="/"], a[href="/index-all.html"], a[href$="-all.html"]').forEach(a => {
       if (a.closest('.gallery-content')) return;
       const href = a.getAttribute('href');
-      if (href === '/' || href === '/index-all.html') {
-        a.setAttribute('href', KOREAN_LINK);
-      } else if (/-all\.html$/.test(href)) {
-        a.setAttribute('href', href.replace(/-all\.html$/, `-${LANG}.html`));
-      }
+      if (href === '/' || href === '/index-all.html') a.setAttribute('href', KOREAN_LINK);
+      else a.setAttribute('href', href.replace(/-all\.html$/, `-${LANG}.html`));
     });
   }
 
@@ -1293,22 +1403,15 @@
     });
   }
 
-  function buildCardHost(media, readerUrl, title, id, seenIds) {
+  let openCardMeta = null;
+
+  function buildCardHost(media, readerUrl, title, id, seenIds, meta) {
     const cardHost = document.createElement('div');
     cardHost.className = 'hk-card-host';
     cardHost.style.cssText = 'display:block;';
     const sh = cardHost.attachShadow({ mode: 'open' });
-    sh.innerHTML = `
-      <style>${CARD_CSS}</style>
-      <div class="card">
-        <a class="thumb"></a>
-        <button class="grp" type="button" style="display:none"></button>
-        <div class="grplist" style="display:none"></div>
-        <div class="info">
-          <div class="title"><a></a></div>
-          <div class="dline"></div>
-        </div>
-      </div>`;
+    if (cardSheet) sh.adoptedStyleSheets = [cardSheet];
+    sh.innerHTML = (cardSheet ? '' : `<style>${CARD_CSS}</style>`) + CARD_HTML;
 
     const thumbA = sh.querySelector('.thumb');
     thumbA.href = readerUrl;
@@ -1324,6 +1427,13 @@
     cardHost.dataset.hkId = id;
     if (pgReady.has(String(id))) sh.querySelector('.card').classList.add('ready');
     sh.querySelector('.card').classList.toggle('viewed', seenIds.has(id));
+
+    const dots = sh.querySelector('.dots');
+    dots.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (openCardMeta) openCardMeta({ id, title, meta: meta || { artists: [], groups: [], tags: [] } });
+    });
 
     const grp = sh.querySelector('.grp'), grpList = sh.querySelector('.grplist');
     grp.addEventListener('click', e => {
@@ -1396,7 +1506,7 @@
     card.dataset.hkKey = (title === `No. ${id}`) ? '' : titleKey(dispTitle);
     setDate(id, date);
 
-    const { cardHost, sh } = buildCardHost(media, readerUrl, title, id, seenIds);
+    const { cardHost, sh } = buildCardHost(media, readerUrl, title, id, seenIds, readCardMeta(card));
 
     const cardEl = sh.querySelector('.card');
     const reveal = () => { cardEl.classList.add('hk-on'); card.classList.add('hk-img-ok'); };
@@ -1435,7 +1545,7 @@
       hosts.push(host);
       const key = card.dataset.hkKey;
       let hide = false;
-      if (settings.mergeTitles && key && !card.classList.contains('hk-hidden') && !card.classList.contains('hk-blocked')) {
+      if (settings.mergeTitles && key && !card.classList.contains('hk-hidden') && !card.classList.contains('hk-artsoff')) {
         const o = { id: host.dataset.hkId, date: card.dataset.hkDate || '' };
         const g = groups.get(key);
         if (g) { g.ids.push(o); hide = true; }
@@ -1464,78 +1574,138 @@
     if (!e.persisted) return;
     watched = store.get(KEY.watched, []);
     saved = store.get(KEY.saved, []);
-    blocked = store.get(KEY.blocked, []);
     refreshViewed();
-    applyBlock(true);
+    applyBrowseFilter();
   });
 
   const TAXO_RE = /^\/(tag|artist|group|series|character)\/(.+)-[a-z]+\.html/i;
-  const CARD_INFO = new WeakMap();
+  const CARD_META = new WeakMap();
+  const normArtName = s => String(s || '').toLowerCase().replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
 
-  function normBlock(s) {
-    return (s || '').toLowerCase().replace(/_/g, ' ').replace(/\s+/g, ' ').trim().replace(/^tag:/, '');
-  }
-
-  function getCardInfo(card) {
-    let info = CARD_INFO.get(card);
+  function readCardMeta(card) {
+    let info = CARD_META.get(card);
     if (info) return info;
-    const links = card.querySelectorAll('a[href]');
-    if (!links.length) return null;
-    const keys = new Set(), tags = [];
-    links.forEach(a => {
+    const artists = [], groups = [], tags = [];
+    card.querySelectorAll('a[href]').forEach(a => {
       const m = (a.pathname || '').match(TAXO_RE);
       if (!m) return;
       let name = m[2];
       try { name = decodeURIComponent(name); } catch (e) {}
-      name = normBlock(name);
+      name = name.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
       if (!name) return;
       const type = m[1].toLowerCase();
-      if (type === 'tag') {
-        keys.add(name);
-        const i = name.indexOf(':');
-        if (i > 0) keys.add(name.slice(i + 1));
-        if (tags.indexOf(name) < 0) tags.push(name);
-      } else {
-        const k = type + ':' + name;
-        keys.add(k);
-        if (tags.indexOf(k) < 0) tags.push(k);
-      }
+      const arr = type === 'artist' ? artists : type === 'group' ? groups : type === 'tag' ? tags : null;
+      if (arr && arr.indexOf(name) < 0) arr.push(name);
     });
-    info = { keys, tags };
-    CARD_INFO.set(card, info);
+    info = { artists, groups, tags };
+    CARD_META.set(card, info);
     return info;
   }
 
-  function applyBlock(all) {
-    const set = (settings.blockTags && blocked.length) ? new Set(blocked) : null;
+  let browseArtists = null; // Map(lowerName -> displayName)
+
+  function cardArtists(card) {
+    return readCardMeta(card).artists.map(normArtName);
+  }
+
+  function applyBrowseFilter() {
+    if (!browseArtists) {
+      document.querySelectorAll('.gallery-content > div.hk-artsoff').forEach(c => c.classList.remove('hk-artsoff'));
+      return;
+    }
     document.querySelectorAll('.gallery-content > div').forEach(card => {
-      if (!all && card.dataset.hkBlk) return;
-      const info = getCardInfo(card);
-      if (!info) return;
-      card.dataset.hkBlk = '1';
-      let hit = false;
-      if (set) for (const k of info.keys) { if (set.has(k)) { hit = true; break; } }
-      card.classList.toggle('hk-blocked', hit);
+      const hit = cardArtists(card).some(a => browseArtists.has(a));
+      card.classList.toggle('hk-artsoff', !hit);
     });
-    if (all) mergeDuplicates();
   }
 
-  function addBlock(raw) {
-    const e = normBlock(raw);
-    if (!e || blocked.indexOf(e) >= 0) return false;
-    blocked.unshift(e);
-    saveBlocked();
-    applyBlock(true);
-    kickInfinite();
-    return true;
+  async function collectSavedArtists(list, onProgress) {
+    const found = new Map();
+    const add = v => {
+      const s = String(v || '').replace(/_/g, ' ').trim();
+      if (!s) return;
+      const k = normArtName(s);
+      if (k && !found.has(k)) found.set(k, s);
+    };
+    const need = [];
+    list.forEach(s => {
+      if (Array.isArray(s.arts) && s.arts.length) s.arts.forEach(add);
+      else need.push(s);
+    });
+    const queue = need.slice(0, 60);
+    const total = queue.length;
+    let done = 0;
+    const walk = async () => {
+      while (queue.length) {
+        const s = queue.shift();
+        try {
+          const r = await fetchT('/galleries/' + s.id + '.html', { credentials: 'same-origin' }, 8000);
+          if (r && r.ok) {
+            const d = new DOMParser().parseFromString(await r.text(), 'text/html');
+            const arts = [];
+            d.querySelectorAll('a[href^="/artist/"]').forEach(a => {
+              if (a.closest('.gallery-content')) return;
+              const m = (a.getAttribute('href') || '').match(/^\/artist\/(.+)-[a-z]+\.html/i);
+              if (!m) return;
+              let v = m[1];
+              try { v = decodeURIComponent(v); } catch (e) {}
+              v = v.replace(/_/g, ' ').trim();
+              if (v && arts.indexOf(v) < 0) arts.push(v);
+            });
+            if (arts.length) {
+              s.arts = arts.slice(0, 16);
+              arts.forEach(add);
+            }
+          }
+        } catch (e) {}
+        done++;
+        if (onProgress) onProgress(done, total);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, queue.length) }, walk));
+    saveList();
+    return found;
   }
 
-  function removeBlock(e) {
-    blocked = blocked.filter(x => x !== e);
-    saveBlocked();
-    applyBlock(true);
-    kickInfinite();
+  const BROWSE_SS = 'hk_browse';
+  let onBrowseChange = null;
+
+  function browseList() {
+    const min = +settings.browseMin || 0;
+    return saved.filter(s => s.pick || (min > 0 && (+s.stars || 0) >= min));
   }
+
+  function setBrowseFlag(on) {
+    try {
+      if (on) sessionStorage.setItem(BROWSE_SS, '1');
+      else sessionStorage.removeItem(BROWSE_SS);
+    } catch (e) {}
+  }
+
+  (function restoreBrowse() {
+    let on = false;
+    try { on = sessionStorage.getItem(BROWSE_SS) === '1'; } catch (e) {}
+    if (!on || !currentSort()) return;
+    const list = browseList();
+    if (!list.length) { setBrowseFlag(false); return; }
+    const m = new Map();
+    list.forEach(s => (s.arts || []).forEach(a => {
+      const v = String(a || '').replace(/_/g, ' ').trim();
+      const k = normArtName(v);
+      if (k && !m.has(k)) m.set(k, v);
+    }));
+    browseArtists = m;
+    if (!list.some(s => !(Array.isArray(s.arts) && s.arts.length))) return;
+    collectSavedArtists(list).then(found => {
+      if (!browseArtists) return;
+      if (found.size) browseArtists = found;
+      else { browseArtists = null; setBrowseFlag(false); }
+      applyBrowseFilter();
+      if (settings.mergeTitles) mergeDuplicates();
+      kickInfinite();
+      if (onBrowseChange) onBrowseChange();
+    });
+  })();
 
   let inf = null;
   let infTimer = 0;
@@ -1619,7 +1789,7 @@
       if (!inf || !inf.io) return;
       inf.io.unobserve(inf.el);
       inf.io.observe(inf.el);
-    }, 500);
+    }, 60);
   }
 
   function prefetchNext() {
@@ -1674,7 +1844,7 @@
     if (!n || n === infCount) return;
     infCount = n;
     clearTimeout(infTimer);
-    infTimer = setTimeout(startInfinite, 1000);
+    infTimer = setTimeout(startInfinite, 120);
   }
 
   function startInfinite() {
@@ -1697,11 +1867,12 @@
     if (typeof IntersectionObserver === 'function') {
       inf.io = new IntersectionObserver(es => {
         if (es.some(e => e.isIntersecting)) loadNext();
-      }, { rootMargin: '2400px 0px' });
+      }, { rootMargin: '3600px 0px' });
       inf.io.observe(el);
     }
 
     Array.from(gc.children).forEach(c => { if (!c.dataset.hkPage) c.dataset.hkPage = '1'; });
+    prefetchNext();
 
     let want = 0;
     try { want = +sessionStorage.getItem(SCROLL_KEY + ':p') || 0; } catch (e) {}
@@ -1933,7 +2104,7 @@
     }
     gc.querySelectorAll(':scope > div').forEach(card => {
       if (card.dataset.hkWarm) return;
-      if (card.classList.contains('hk-blocked') || card.classList.contains('hk-hidden') ||
+      if (card.classList.contains('hk-artsoff') || card.classList.contains('hk-hidden') ||
           card.classList.contains('hk-stray')) return;
       card.dataset.hkWarm = '1';
       warm.io.observe(card);
@@ -2169,11 +2340,6 @@
       opacity: Math.min(1, i / 7)
     }));
   }
-  const POP_CLOSE = [
-    { transform: 'scale(1, 1)', opacity: 1, offset: 0 },
-    { transform: 'scale(0.96, 0.9)', opacity: 0.5, offset: 0.5 },
-    { transform: 'scale(0.92, 0.8)', opacity: 0, offset: 1 }
-  ];
 
   function closeFrames() {
     const sx = springKeys(1, 0.86, 340, 26, 30);
@@ -2264,6 +2430,7 @@
           .filter(x => x && typeof x[0] === 'string')
           .slice(0, 10)
           .map(x => ({ t: x[0], c: Number(x[1]) || 0, ty: String(x[2] || '') }));
+        if (tagCache.size > 400) tagCache.delete(tagCache.keys().next().value);
         tagCache.set(path, out);
         return out;
       })
@@ -2280,7 +2447,7 @@
       out.push({ t: s, k, h });
     };
     hist.forEach(id => push(id, '최근', true));
-    saved.forEach(s => push(s.id, '북마크', false));
+    saved.forEach(s => push(s.id, '일지', false));
     watched.forEach(w => push(w.id, '기록', false));
     return out;
   }
@@ -2311,7 +2478,8 @@
 
   ICON.edit = SV('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>');
   ICON.copy = SV('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>');
-  ICON.trash = SV('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>');
+  ICON.journal = SV('<path class="jb" d="M6.5 3H18v18H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3z"/><path d="M9 3v18"/><path d="M12 8h3.5M12 11.5h3.5"/>');
+  ICON.compass = SV('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>');
 
   const thumbIO = typeof IntersectionObserver === 'function'
     ? new IntersectionObserver(es => {
@@ -2365,14 +2533,14 @@
           <div class="bottom">
             ${curSort ? `
             <button class="filt pill" type="button" id="filt" title="정렬 바꾸기">
-              ${ICON.sort}<span class="fl">${SORT_KR[curSort] || ''}</span>
+              ${ICON.sort}<span class="fl">${browseArtists ? '둘러보기' : (SORT_KR[curSort] || '')}</span>
             </button>` : ''}
             <div class="bar pill" id="bar">
               ${curId ? `
               <button class="cur" type="button" id="curNum" title="품번 복사">${curId}</button>
-              <button class="ib pin" type="button" id="star" title="즐겨찾기에 추가">${ICON.pin}</button>` : ''}
+              <button class="ib pin" type="button" id="star" title="일지 작성">${ICON.journal}</button>` : ''}
               <button class="ib" type="button" id="searchBtn" title="검색">${ICON.search}</button>
-              <button class="ib" type="button" id="histBtn" title="최근 / 북마크">${ICON.hist}</button>
+              <button class="ib" type="button" id="histBtn" title="최근 / 일지">${ICON.hist}</button>
               <button class="ib gear" type="button" id="setBtn" title="설정">${ICON.gear}</button>
             </div>
             <button class="hfix" type="button" id="homeBtn" title="히토미 홈 또는 직전 화면 선택"><b class="hh">H</b></button>
@@ -2418,11 +2586,15 @@
     if (typeof ResizeObserver === 'function') new ResizeObserver(() => syncGlass()).observe(panel);
 
     const vv = window.visualViewport;
+    let kbSig = '';
     function syncKeyboard() {
       const inner = window.innerHeight;
       const vis = vv ? vv.height + vv.offsetTop : inner;
       const kb = Math.max(0, Math.round(inner - vis));
       const topPanel = panel.classList.contains('top');
+      const sig = kb + (topPanel ? 't' : 'b');
+      if (sig === kbSig) return;
+      kbSig = sig;
       wrap.style.transform = (kb > 2 && !topPanel) ? 'translateY(' + -kb + 'px)' : '';
       panel.style.maxHeight = kb > 2 ? Math.max(140, Math.round((vv ? vv.height : inner) - 150)) + 'px' : '';
     }
@@ -2472,7 +2644,7 @@
     function thumbEl(id) {
       const box = el('div', 'tb');
       box.title = '클릭: 열기';
-      const showEmpty = () => { box.textContent = '이미지 없음'; };
+      const showEmpty = () => { box.insertBefore(el('span', '', '이미지 없음'), box.firstChild); };
       const u = thumbs[id];
       if (u) {
         const im = document.createElement('img');
@@ -2486,18 +2658,66 @@
       return box;
     }
 
-    function animHeight(apply) {
-      const h0 = panel.offsetHeight;
-      apply();
-      const h1 = panel.offsetHeight;
-      if (h0 === h1) return;
+    const SWAP_OUT = 130;
+    const SWAP_EASE = 'cubic-bezier(.22,1,.36,1)';
+    let swapSeq = 0, swapT = 0;
+
+    function resetPanelStyle() {
+      panel.style.height = ''; panel.style.width = '';
+      panel.style.transition = ''; panel.style.overflow = '';
+    }
+
+    // 내용이 이미 바뀐 상태에서, h0 높이부터 새 높이까지 부드럽게 늘이거나 줄인다
+    function growFrom(h0, w0) {
+      clearTimeout(swapT);
+      const my = swapSeq;
+      panel.style.transition = '';
+      panel.style.height = '';
+      if (w0 != null) panel.style.width = '';
+      const h1 = panel.offsetHeight, w1 = panel.offsetWidth;
+      if (h0 === h1 && (w0 == null || w0 === w1)) { resetPanelStyle(); return; }
       panel.style.overflow = 'hidden';
       panel.style.height = h0 + 'px';
-      requestAnimationFrame(() => {
-        panel.style.transition = 'height .34s cubic-bezier(.22,1,.36,1)';
-        panel.style.height = h1 + 'px';
-        setTimeout(() => { panel.style.height = ''; panel.style.transition = ''; panel.style.overflow = ''; }, 380);
-      });
+      if (w0 != null) panel.style.width = w0 + 'px';
+      void panel.offsetWidth;
+      panel.style.transition = `height .36s ${SWAP_EASE}, width .36s ${SWAP_EASE}`;
+      panel.style.height = h1 + 'px';
+      if (w0 != null) panel.style.width = w1 + 'px';
+      swapT = setTimeout(() => { if (my === swapSeq) resetPanelStyle(); }, 400);
+    }
+
+    function growRender(fn) {
+      const h0 = panel.offsetHeight;
+      fn();
+      growFrom(h0);
+    }
+
+    function fadeOut(nodes) {
+      nodes.forEach(k => k.animate && k.animate(
+        [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-4px) scale(.985)' }],
+        { duration: SWAP_OUT, easing: 'ease-in', fill: 'forwards' }));
+    }
+
+    function fadeIn(nodes) {
+      nodes.forEach((k, i) => k.animate && k.animate(
+        [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
+        { duration: 320, delay: 50 + Math.min(i, 6) * 28, easing: SWAP_EASE, fill: 'backwards' }));
+    }
+
+    // 지금 요소를 흐리게 지운 뒤 build()로 새 요소를 만들고, 높이를 바꾸며 바로 보여준다
+    function fadeSwap(outNodes, build) {
+      const my = ++swapSeq;
+      clearTimeout(swapT);
+      const h0 = panel.offsetHeight;
+      panel.style.overflow = 'hidden';
+      panel.style.height = h0 + 'px';
+      fadeOut(outNodes);
+      swapT = setTimeout(() => {
+        if (my !== swapSeq) return;
+        const fresh = build() || [];
+        growFrom(h0);
+        fadeIn(fresh);
+      }, SWAP_OUT);
     }
 
     let toastTimer = 0;
@@ -2541,8 +2761,58 @@
       if (st && curId) {
         const on = isSaved(curId);
         st.classList.toggle('on', on);
-        st.title = on ? '즐겨찾기 해제' : '북마크 추가 (별명·별점)';
+        st.title = on ? '일지 수정' : '일지 작성 (별명·별점)';
       }
+    }
+
+    function paintFilt() {
+      const fl = $('#filt .fl');
+      if (!fl || !curSort) return;
+      const t = browseArtists ? '둘러보기' : (SORT_KR[curSort] || '');
+      if (fl.textContent === t) return;
+      if (settings.typeFx) setChars(fl, t);
+      else fl.textContent = t;
+    }
+    onBrowseChange = () => {
+      paintFilt();
+      if (panelMode === 'sort') growRender(renderSort);
+    };
+
+    function segCtl(items, cur, onPick, cls) {
+      const seg = el('div', 'seg' + (cls ? ' ' + cls : ''));
+      const ind = el('span', 'segi');
+      seg.appendChild(ind);
+      seg._cur = cur;
+      const bs = items.map(([k, t]) => {
+        const b = el('button', 'segb' + (k === cur ? ' on' : ''), t);
+        b.type = 'button';
+        b.dataset.k = k;
+        b.addEventListener('click', () => {
+          if (seg._cur === k) return;
+          seg._set(k);
+          onPick(k);
+        });
+        seg.appendChild(b);
+        return b;
+      });
+      const place = anim => {
+        const b = bs.find(x => x.dataset.k === seg._cur);
+        if (!b || !b.offsetWidth) return false;
+        if (!anim) seg.classList.add('noanim');
+        ind.style.width = b.offsetWidth + 'px';
+        ind.style.transform = 'translateX(' + b.offsetLeft + 'px)';
+        if (!anim) { void ind.offsetWidth; seg.classList.remove('noanim'); }
+        seg.classList.add('slide');
+        return true;
+      };
+      seg._set = k => {
+        seg._cur = k;
+        bs.forEach(b => b.classList.toggle('on', b.dataset.k === k));
+        place(true);
+      };
+      const tryPlace = n => { if (!place(false) && n < 30) requestAnimationFrame(() => tryPlace(n + 1)); };
+      requestAnimationFrame(() => tryPlace(0));
+      return seg;
     }
 
     host.addEventListener('keydown', e => {
@@ -2686,6 +2956,7 @@
 
       const info = await fxLoadInfo(id);
       if (my !== infoSeq || panelMode !== 'info') return;
+      const h0 = panel.offsetHeight;
       panel.textContent = '';
 
       panel.appendChild(el('div', 'lbl', '제목'));
@@ -2749,6 +3020,7 @@
       olink.href = '/galleries/' + id + '.html';
       orow.appendChild(olink);
       panel.appendChild(orow);
+      growFrom(h0);
 
       if (!dates[id]) loadDate(id, my);
     }
@@ -2770,16 +3042,9 @@
 
     function renderHist() {
       panel.textContent = '';
-      const seg = el('div', 'seg');
-      [['recent', '모두'], ['saved', '북마크']].forEach(([k, t]) => {
-        const b = el('button', 'segb' + (histMode === k ? ' on' : ''), t);
-        b.type = 'button';
-        b.addEventListener('click', () => {
-          if (histMode === k) return;
-          histMode = k;
-          switchHist();
-        });
-        seg.appendChild(b);
+      const seg = segCtl([['recent', '모두'], ['saved', '일지']], histMode, k => {
+        histMode = k;
+        switchHist();
       });
       const head = el('div', 'hhead');
       head.append(seg);
@@ -2791,17 +3056,12 @@
     function switchHist() {
       const body = panel.querySelector('.hbody');
       if (!body) return renderHist();
-      panel.querySelectorAll('.segb').forEach((b, i) => {
-        b.classList.toggle('on', (i === 0 ? 'recent' : 'saved') === histMode);
-      });
       filterText = ''; histFilter = '';
-      animHeight(() => {
-        body.textContent = '';
+      const out = Array.from(panel.querySelectorAll('.hhead .hrow')).concat(Array.from(body.children));
+      fadeSwap(out, () => {
+        body.scrollTop = 0;
         buildHistBody(body);
-        body.classList.remove('hin');
-        void body.offsetWidth;
-        body.classList.add('hin');
-        setTimeout(() => body.classList.remove('hin'), 340);
+        return Array.from(panel.querySelectorAll('.hhead .hrow')).concat(Array.from(body.children));
       });
     }
 
@@ -2817,14 +3077,25 @@
       const r1 = el('div', 'row hrow');
       const search = el('input', 'field');
       if (histMode === 'saved') {
-        search.placeholder = '북마크 검색';
+        search.placeholder = '일지 검색';
         search.value = filterText;
         search.addEventListener('input', () => { filterText = search.value.trim().toLowerCase(); renderItems(); });
         r1.append(search, btn('전체복사', 'fit', () => copyIds(saved.map(s => s.id))));
+        const bar = el('div', 'jbar');
+        const cnt = el('span', 'jn', '일지 ' + saved.length + '개');
+        cnt.id = 'jcount';
+        const sort = segCtl([['date', '작성일순'], ['stars', '별점순']], settings.jSort === 'stars' ? 'stars' : 'date', k => {
+          settings.jSort = k;
+          saveSettings();
+          const box = panel.querySelector('#items');
+          if (!box) return;
+          fadeSwap(Array.from(box.children), () => { renderItems(); return Array.from(box.children); });
+        }, 'sm');
+        bar.append(cnt, sort);
         const list = el('div', 'list');
         list.id = 'items';
         head.append(r1);
-        body.append(list);
+        body.append(bar, list);
         renderItems();
       } else {
         search.placeholder = '기록 검색 (품번)';
@@ -2854,10 +3125,17 @@
       if (!box) return;
       box.textContent = '';
       const f = filterText;
+      const cnt = panel.querySelector('#jcount');
+      if (cnt) cnt.textContent = '일지 ' + saved.length + '개';
       const items = saved.filter(s => !f || s.id.includes(f) ||
         (s.alias || '').toLowerCase().includes(f) || (s.title || '').toLowerCase().includes(f));
+      if (settings.jSort === 'stars') {
+        items.sort((a, b) => (+b.stars || 0) - (+a.stars || 0) || (b.ts || 0) - (a.ts || 0));
+      } else {
+        items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      }
       if (!items.length) {
-        box.appendChild(el('div', 'empty', saved.length ? '검색 결과가 없습니다' : '저장된 품번이 없습니다'));
+        box.appendChild(el('div', 'empty', saved.length ? '검색 결과가 없습니다' : '작성한 일지가 없습니다'));
         return;
       }
       items.forEach(s => {
@@ -2868,27 +3146,48 @@
         const day = new Date(s.ts).toLocaleDateString('ko-KR');
         if (s.stars) dt.appendChild(starsEl(s.stars));
         dt.appendChild(el('div', 'dd', day));
-        info.append(el('div', 'id', s.id), el('div', 'ttl', s.alias || s.title || dates[s.id] || ''), dt);
+        info.append(el('div', 'ttl', s.alias || s.title || dates[s.id] || ''), dt);
         info.addEventListener('click', () => goTo(s.id));
 
         const foot = el('div', 'foot');
         foot.append(info);
         const tb = thumbEl(s.id);
-        const del = el('button', 'xdel lt', '✕');
+        const fl = el('div', 'tfl');
+        const tid = el('span', 'tid', s.id);
+        tid.title = '클릭: 품번 복사';
+        tid.addEventListener('click', e => {
+          e.stopPropagation();
+          copyText(s.id).then(() => toast('품번 복사됨'));
+        });
+        const del = el('button', 'tx', '✕');
         del.type = 'button';
-        del.title = '북마크 삭제';
+        del.title = '일지 삭제';
         del.addEventListener('click', e => {
           e.stopPropagation();
           removeSaved(s.id);
           updateCounts();
           renderItems();
         });
-        tb.appendChild(del);
+        fl.append(tid, del);
+        tb.appendChild(fl);
+        const pickB = iconBtn(ICON.compass, '', () => {
+          const it = savedOf(s.id);
+          if (!it) return;
+          it.pick = !it.pick;
+          saveList();
+          paintPick();
+          toast(it.pick ? '둘러보기에 포함' : '둘러보기에서 제외');
+          if (browseArtists) startBrowse();
+        });
+        const paintPick = () => {
+          const on = !!(savedOf(s.id) || {}).pick;
+          pickB.classList.toggle('on', on);
+          pickB.title = on ? '둘러보기에서 제외' : '둘러보기에 포함';
+          pickB.setAttribute('aria-label', pickB.title);
+        };
+        paintPick();
         const acts = el('div', 'acts');
-        acts.append(
-          iconBtn(ICON.edit, '수정', () => openBm(s.id, 'hist')),
-          iconBtn(ICON.copy, '복사', () => copyText(s.id).then(() => toast('복사됨')))
-        );
+        acts.append(iconBtn(ICON.edit, '일지 수정', () => openBm(s.id, 'hist')), pickB);
         row.append(tb, foot, acts);
         box.appendChild(row);
       });
@@ -2952,10 +3251,18 @@
     function renderBm() {
       panel.textContent = '';
       const it = savedOf(bmId);
-      const title = (it && it.title) || dates[bmId] || '';
+      const isCur = bmId === curId;
+      let pageT = '';
+      if (!it && isCur) {
+        pageT = getPageTitle();
+        if (/^hitomi/i.test(pageT)) pageT = '';
+        if (pageT && settings.koreanTitle) pageT = koreanTitle(pageT);
+      }
+      const title = (it && it.title) || pageT || dates[bmId] || '';
       let stars = (it && it.stars) || 0;
+      let pick = !!(it && it.pick);
 
-      panel.appendChild(el('div', 'lbl', '북마크'));
+      panel.appendChild(el('div', 'lbl', it ? '일지 수정' : '일지 작성'));
       panel.appendChild(el('div', 'bmt', bmId + (title ? '  ·  ' + title : '')));
 
       const r1 = el('div', 'row');
@@ -2985,12 +3292,20 @@
       paint();
       panel.appendChild(row);
 
+      const pt = el('div', 'tog inl' + (pick ? ' on' : ''), '둘러보기에 포함');
+      pt.setAttribute('role', 'switch');
+      pt.title = '별점과 상관없이 이 작품의 작가를 둘러보기에 넣습니다';
+      pt.addEventListener('click', () => { pick = !pick; pt.classList.toggle('on', pick); });
+      panel.appendChild(pt);
+
       const save = () => {
         const alias = inp.value.trim();
-        if (isSaved(bmId)) updateSaved(bmId, alias, stars);
-        else addSaved(bmId, title, alias, stars);
+        const arts = isCur ? pageArtists(bmId) : null;
+        const was = isSaved(bmId);
+        if (was) updateSaved(bmId, alias, stars, arts, pick);
+        else addSaved(bmId, title, alias, stars, arts, pick);
         updateCounts();
-        toast(alias ? '북마크 저장: ' + alias : '즐겨찾기에 추가');
+        toast(was ? '일지 수정됨' : (alias ? '일지 작성: ' + alias : '일지에 기록했습니다'));
         backFromBm();
       };
       inp.addEventListener('keydown', e => {
@@ -3004,12 +3319,12 @@
         r2.appendChild(btn('삭제', 'sm', () => {
           removeSaved(bmId);
           updateCounts();
-          toast('즐겨찾기 해제');
+          toast('일지를 삭제했습니다');
           backFromBm();
         }));
       }
       panel.appendChild(r2);
-      panel.appendChild(el('div', 'hint', '별명을 적으면 제목 대신 그 별명이 보입니다. 별점은 목록에 ★로 표시됩니다.'));
+      panel.appendChild(el('div', 'hint', '별명을 적으면 제목 대신 그 별명이 보입니다. 별점은 일지 목록에 ★로 표시되고, 둘러보기 기준으로도 쓰입니다.'));
     }
 
     function importList() {
@@ -3025,6 +3340,8 @@
             saved.push({
               id, title: (o && o.title) || '', alias: (o && o.alias) || '',
               stars: Math.max(0, Math.min(5, Math.round(+(o && o.stars) || 0))),
+              arts: Array.isArray(o && o.arts) ? o.arts.slice(0, 16) : [],
+              pick: !!(o && o.pick),
               ts: (o && o.ts) || Date.now()
             });
             added++;
@@ -3046,32 +3363,115 @@
       panel.appendChild(el('div', 'lbl', '정렬'));
       const list = el('div', 'slist');
       const cur = currentSort();
-      SORTS.forEach(([key, , url]) => {
-        const b = el('button', 'srow' + (key === cur ? ' on' : ''), SORT_KR[key] || key);
+      SORTS.forEach(([key, url]) => {
+        const b = el('button', 'srow' + (key === cur && !browseArtists && !browseBusy ? ' on' : ''), SORT_KR[key] || key);
         b.type = 'button';
-        b.addEventListener('click', () => { location.href = url; });
+        b.addEventListener('click', () => {
+          setBrowseFlag(false);
+          if (key === cur && (browseArtists || browseBusy)) {
+            stopBrowse();
+            toast('둘러보기를 해제했습니다');
+            return;
+          }
+          location.href = url;
+        });
         list.appendChild(b);
       });
+      const bb = el('button', 'srow' + (browseArtists || browseBusy ? ' on' : ''), '둘러보기');
+      bb.type = 'button';
+      bb.addEventListener('click', () => { if (!browseArtists && !browseBusy) startBrowse(); });
+      list.appendChild(bb);
       panel.appendChild(list);
+
+      panel.appendChild(el('div', 'lbl', '둘러보기 기준'));
+      const min = +settings.browseMin || 0;
+      const row = el('div', 'stars');
+      for (let i = 1; i <= 5; i++) {
+        const b = el('button', 'starb' + (i <= min ? ' on' : ''));
+        b.innerHTML = starSvg(false);
+        b.type = 'button';
+        b.title = i + '점 이상';
+        b.addEventListener('click', () => {
+          settings.browseMin = (settings.browseMin === i ? 0 : i);
+          saveSettings();
+          if (browseArtists || browseBusy) startBrowse();
+          else growRender(renderSort);
+        });
+        row.appendChild(b);
+      }
+      panel.appendChild(row);
+      const picks = saved.filter(s => s.pick).length;
+      const byStar = min ? saved.filter(s => !s.pick && (+s.stars || 0) >= min).length : 0;
+      panel.appendChild(el('div', 'hint',
+        (min ? '별점 ' + min + '점 이상 일지 ' + byStar + '개' : '별점 기준 없음') +
+        ' + 직접 고른 일지 ' + picks + '개의 작가 작품만 보여줍니다. ' +
+        '일지 목록의 나침반 버튼이나 일지 작성 화면에서 고를 수 있습니다.'));
+
+      if (browseBusy) {
+        panel.appendChild(el('div', 'hint browse-status', '일지 작가 정보 확인 중…'));
+      } else if (browseArtists) {
+        const names = Array.from(browseArtists.values());
+        const shown = document.querySelectorAll(
+          '.gallery-content > div:not(.hk-artsoff):not(.hk-hidden):not(.hk-merged):not(.hk-stray)').length;
+        panel.appendChild(el('div', 'hint', '작가 ' + names.length + '명 · 현재 목록에서 ' + shown + '개 작품'));
+        panel.appendChild(el('div', 'lbl', '작가 목록'));
+        const c = el('div', 'chips');
+        names.slice(0, 40).forEach(a => c.appendChild(chipLink(a, `/artist/${enc(a)}-${LANG}.html`, 'a')));
+        panel.appendChild(c);
+      }
+    }
+
+    function browseApplied() {
+      applyBrowseFilter();
+      if (settings.mergeTitles) mergeDuplicates();
+      paintFilt();
+      kickInfinite();
+    }
+
+    function stopBrowse() {
+      browseSeq++;
+      browseBusy = false;
+      browseArtists = null;
+      setBrowseFlag(false);
+      browseApplied();
+      if (panelMode === 'sort') growRender(renderSort);
+    }
+
+    let browseBusy = false, browseSeq = 0;
+    async function startBrowse() {
+      const list = browseList();
+      if (!list.length) {
+        toast(saved.length ? '기준에 맞는 일지가 없습니다' : '작성한 일지가 없습니다');
+        if (browseArtists || browseBusy) stopBrowse();
+        else if (panelMode === 'sort') growRender(renderSort);
+        return;
+      }
+      const my = ++browseSeq;
+      browseBusy = true;
+      if (panelMode === 'sort') growRender(renderSort);
+      const found = await collectSavedArtists(list, (done, total) => {
+        if (my !== browseSeq || panelMode !== 'sort') return;
+        const st = panel.querySelector('.browse-status');
+        if (st) st.textContent = '일지 작가 정보 확인 중… ' + done + ' / ' + total;
+      });
+      if (my !== browseSeq) return;
+      browseBusy = false;
+      if (!found.size) {
+        toast('일지 작품에서 작가를 찾지 못했습니다');
+        stopBrowse();
+        return;
+      }
+      browseArtists = found;
+      setBrowseFlag(true);
+      browseApplied();
+      const n = document.querySelectorAll(
+        '.gallery-content > div:not(.hk-artsoff):not(.hk-hidden):not(.hk-merged):not(.hk-stray)').length;
+      if (panelMode === 'sort') growRender(renderSort);
+      toast('작가 ' + found.size + '명 · ' + n + '개 작품');
     }
 
     function renderSettings() {
       panel.textContent = '';
-      const helpRow = el('div', 'row');
-      helpRow.append(btn('? 기능 설명', '', () => setPanel('help')));
-      panel.appendChild(helpRow);
-
-      const cur = currentSort();
-      if (cur) {
-        panel.appendChild(el('div', 'lbl', '정렬'));
-        const c = el('div', 'chips');
-        SORTS.forEach(([key, , url]) => {
-          const a = el('span', 'chip' + (cur === key ? ' on' : ''), SORT_KR[key] || key);
-          a.addEventListener('click', () => { location.href = url; });
-          c.appendChild(a);
-        });
-        panel.appendChild(c);
-      }
 
       panel.appendChild(el('div', 'lbl', '기능'));
       const grid = el('div', 'tgrid');
@@ -3101,7 +3501,7 @@
       });
       panel.appendChild(grid);
 
-      panel.appendChild(el('div', 'lbl', '북마크 (' + saved.length + ')'));
+      panel.appendChild(el('div', 'lbl', '일지 (' + saved.length + ')'));
       const br = el('div', 'row wrap-row');
       br.append(
         btn('내보내기', '', () => copyText(JSON.stringify(saved)).then(() => toast('클립보드에 복사했습니다'))),
@@ -3109,13 +3509,19 @@
       );
       panel.appendChild(br);
 
-      panel.appendChild(el('div', 'lbl', '차단 (' + blocked.length + ')'));
-      const cb2 = el('div', 'row');
-      cb2.append(
-        btn('차단 목록 관리', '', () => setPanel('block')),
-        btn('진단 로그 보기', '', () => setPanel('log'))
-      );
-      panel.appendChild(cb2);
+      panel.appendChild(el('div', 'lbl', '도구'));
+      const tr = el('div', 'row');
+      tr.appendChild(btn('진단 로그 보기', '', () => setPanel('log')));
+      panel.appendChild(tr);
+
+      const fab = el('div', 'fabwrap');
+      const hb = el('button', 'helpfab', '?');
+      hb.type = 'button';
+      hb.title = '기능 설명';
+      hb.setAttribute('aria-label', '기능 설명');
+      hb.addEventListener('click', () => setPanel('help'));
+      fab.appendChild(hb);
+      panel.appendChild(fab);
     }
 
     function renderHelp() {
@@ -3125,9 +3531,11 @@
         ['목록', [
           ['카드 누르기', '작품이 커지면서 1페이지로 바뀌어 열립니다. 1페이지가 미리 받아진 카드에는 흰 테두리가 생깁니다.'],
           ['파란 테두리와 그라데이션', '이미 본 작품입니다.'],
+          ['제목 아래 날짜', '작품의 게시일자를 작고 흐리게 보여줍니다.'],
+          ['오른쪽 아래 ⋯', '작품의 태그와 작가를 팝업으로 보여줍니다.'],
           ['×N 뱃지', '제목이 같은 작품이 여러 개 묶여 있다는 뜻입니다. 누르면 목록이 펼쳐집니다.'],
-          ['정렬 필터', '목록 정렬 방식을 바꿉니다.'],
-          ['하단 알약', '품번 복사, 북마크(☆), 검색, 최근·북마크 목록, 설정을 엽니다.']
+          ['정렬 필터', '목록 정렬 방식을 바꿉니다. 둘러보기를 고르면 기준 별점 이상이거나 직접 고른 일지의 작가 작품만 보여줍니다.'],
+          ['하단 알약', '품번 복사, 일지 작성, 검색, 최근·일지 목록, 설정을 엽니다.']
         ]],
         ['리더', [
           ['왼쪽 탭 · ←', '다음 페이지로 넘어갑니다.'],
@@ -3145,7 +3553,7 @@
           ['Only Korean', '한국어 작품만 보여줍니다. 바꾸면 새로고침합니다.'],
           ['Unlimited scroll', '목록을 끝없이 이어 붙입니다. 바꾸면 새로고침합니다.'],
           ['차단 목록 관리', '태그와 작가 차단을 관리합니다.'],
-          ['북마크 내보내기·가져오기', '북마크를 JSON으로 복사하거나 붙여넣습니다.'],
+          ['일지 내보내기·가져오기', '일지를 JSON으로 복사하거나 붙여넣습니다.'],
           ['진단 로그 보기', '미리 받기 실패 같은 문제를 확인합니다.']
         ]]
       ];
@@ -3370,38 +3778,25 @@
         if (b) b.classList.toggle('active', sel === activeSel);
       });
 
+      const my = ++swapSeq;
+      clearTimeout(swapT);
       if (mode) {
         const wasOpen = panel.classList.contains('open') && !panel.classList.contains('out');
-        panel.scrollTop = 0;
-        panel.style.height = ''; panel.style.transition = ''; panel.style.overflow = '';
-        RENDERERS[mode]();
-
-        panel.classList.toggle('mini', mode === 'home' || mode === 'confirm');
-        panel.classList.toggle('top', mode === 'search');
-        panel.classList.toggle('hist', mode === 'hist');
-        syncKeyboard();
         scrim.classList.add('on');
         if (prev && wasOpen) {
-          const fromR = glass.getBoundingClientRect();
-          panel.classList.remove('out');
-          panel.classList.add('open');
-          const toR = panel.getBoundingClientRect();
-          glass.style.left = toR.left + 'px';
-          glass.style.top = toR.top + 'px';
-          glass.style.width = toR.width + 'px';
-          glass.style.height = toR.height + 'px';
-          if (panel.animate) panel.animate(
-            [{ opacity: 0.35, transform: 'translateY(8px) scale(.985)' }, { opacity: 1, transform: 'none' }],
-            { duration: 300, easing: 'cubic-bezier(.22,1,.36,1)' });
-          if (glass.animate && fromR.width) glass.animate([
-            { left: fromR.left + 'px', top: fromR.top + 'px', width: fromR.width + 'px', height: fromR.height + 'px' },
-            { left: toR.left + 'px', top: toR.top + 'px', width: toR.width + 'px', height: toR.height + 'px' }
-          ], { duration: 300, easing: 'cubic-bezier(.22,1,.36,1)' });
+          if ((prev === 'search') !== (mode === 'search')) {
+            // 위/아래 위치가 바뀌는 경우: 닫히는 동작 뒤에 새 위치에서 연다
+            popClose(panel, glass, () => { if (my === swapSeq) showPanel(mode); });
+          } else {
+            morphPanel(mode, my);
+          }
         } else {
-          popOpen(panel, glass);
+          showPanel(mode);
         }
       } else {
         popClose(panel, glass, () => {
+          if (my !== swapSeq) return;
+          resetPanelStyle();
           if (!panelMode) panel.textContent = '';
           panel.classList.remove('top', 'hist');
           scrim.classList.remove('on');
@@ -3411,9 +3806,47 @@
       root.classList.toggle('pop', !!panelMode);
     }
 
-    sh.querySelectorAll('#bar button, #tl button, #filt, #pg').forEach(b => {
+    function paintMode(mode) {
+      panel.scrollTop = 0;
+      RENDERERS[mode]();
+      panel.classList.toggle('mini', mode === 'home' || mode === 'confirm');
+      panel.classList.toggle('top', mode === 'search');
+      panel.classList.toggle('hist', mode === 'hist');
+      syncKeyboard();
+    }
+
+    function showPanel(mode) {
+      resetPanelStyle();
+      paintMode(mode);
+      popOpen(panel, glass);
+    }
+
+    // 열린 팝업 안에서 화면 전환: 기존 요소가 사라지고 → 높이가 바뀌면서 → 새 요소가 바로 나타난다
+    function morphPanel(mode, my) {
+      panel.getAnimations().forEach(a => a.cancel());
+      const h0 = panel.offsetHeight, w0 = panel.offsetWidth;
+      panel.style.transition = '';
+      panel.style.overflow = 'hidden';
+      panel.style.height = h0 + 'px';
+      panel.style.width = w0 + 'px';
+      fadeOut(Array.from(panel.children));
+      swapT = setTimeout(() => {
+        if (my !== swapSeq) return;
+        paintMode(mode);
+        growFrom(h0, w0);
+        fadeIn(Array.from(panel.children));
+      }, SWAP_OUT);
+    }
+
+    const MODE_OF = {
+      searchBtn: 'search', histBtn: 'hist', setBtn: 'set', infoBtn: 'info',
+      filt: 'sort', star: 'bm', pg: 'preview', homeBtn: 'home'
+    };
+    sh.querySelectorAll('#bar button, #tl button, #filt, #pg, #homeBtn').forEach(b => {
       b.addEventListener('click', e => {
         if (!panelMode) return;
+        // 다른 팝업 버튼이면 그대로 넘겨서 열린 팝업 안에서 전환한다
+        if (MODE_OF[b.id] && !b.classList.contains('active')) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         setPanel(null, true);
@@ -3450,17 +3883,9 @@
 
     const star = $('#star');
     if (star) {
-      star.title = '북마크 추가 (별명·별점)';
       star.addEventListener('click', () => {
         if (!curId) return;
-        if (isSaved(curId)) {
-          removeSaved(curId);
-          updateCounts();
-          toast('즐겨찾기 해제');
-          if (panelMode === 'hist') (histMode === 'saved' ? renderItems : renderHistItems)();
-        } else {
-          openBm(curId, panelMode === 'hist' ? 'hist' : null);
-        }
+        openBm(curId, panelMode === 'hist' ? 'hist' : null);
       });
     }
 
@@ -3492,26 +3917,6 @@
         e.stopPropagation();
       }
     }, true);
-
-    const barS = { c: 0, v: 0, target: 0, raf: 0 };
-    function barStep() {
-      const K = 150, D = 14, dt = 1 / 60;
-      barS.v += (-K * (barS.c - barS.target) - D * barS.v) * dt;
-      barS.c += barS.v * dt;
-      barS.c = Math.max(-0.3, Math.min(1.3, barS.c));
-      root.style.setProperty('--c', barS.c.toFixed(4));
-      if (Math.abs(barS.c - barS.target) < 0.001 && Math.abs(barS.v) < 0.005) {
-        barS.c = barS.target;
-        barS.v = 0;
-        root.style.setProperty('--c', String(barS.c));
-        barS.raf = 0;
-        return;
-      }
-      barS.raf = requestAnimationFrame(barStep);
-    }
-    function barWake() { if (!barS.raf) barS.raf = requestAnimationFrame(barStep); }
-    function barKick(v) { barS.v += v; barWake(); }
-    function barTo(t) { barS.target = t; barWake(); }
 
     const pressS = { p: 0, v: 0, t: 0, raf: 0 };
     function pressStep() {
@@ -4067,7 +4472,7 @@
   }
 
   const drag = { id: null, x0: 0, y0: 0, px0: 0, py0: 0, mode: 0, dir: 0, dx: 0, lastX: 0, lastT: 0, v: 0,
-    outL: null, inL: null, info: null, next: 0, my: 0, files: null };
+    outL: null, inL: null, info: null, next: 0, files: null };
   const pts = new Map();
   let pinch = null;
 
@@ -4086,7 +4491,7 @@
 
     drag.dir = dir;
     drag.next = next;
-    drag.my = ++turnSeq;
+    ++turnSeq;
     coverUp();
     ensureWrap();
     drag.outL = curLayer ? freezeLayer(curLayer) : (leaving.size ? null : outgoingLayer());
@@ -4548,24 +4953,22 @@
     fxEarly();
   });
 
-  let lastCount = -2;
   let nativeReady = false;
+  let nativeDirty = true;
   let runT = 0;
 
   function run() {
-    const gc = document.querySelector('.gallery-content');
-    const cnt = gc ? gc.children.length : -1;
-    if (!nativeReady || cnt !== lastCount) {
+    if (!nativeReady || nativeDirty) {
       nativeReady = true;
-      lastCount = cnt;
+      nativeDirty = false;
       paintListBg();
       hideNative();
       pruneNative();
     }
     rewriteLinks(document);
     filterGalleries(document);
-    applyBlock(false);
     if (settings.cardStyle) restyleCards(document);
+    applyBrowseFilter();
     if (settings.mergeTitles) mergeDuplicates();
     initInfinite();
     warmPages();
@@ -4579,6 +4982,7 @@
   const observer = new MutationObserver(muts => {
     if (runT) return;
     if (muts.every(m => isOursNode(m.target) && [...m.addedNodes, ...m.removedNodes].every(isOursNode))) return;
+    if (muts.some(m => !isOursNode(m.target) && !(m.target.closest && m.target.closest('.gallery-content')))) nativeDirty = true;
     runT = setTimeout(() => {
       runT = 0;
       run();
