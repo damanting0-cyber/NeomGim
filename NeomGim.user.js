@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.9.1
+// @version      1.9.2
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.9.1';
+  const VERSION = '1.9.2';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -525,7 +525,11 @@
     .tl .pg {
       padding: 0 12px 0 14px; font-size: 13px; font-weight: 700; color: #fff;
       font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer;
+      user-select: none; -webkit-tap-highlight-color: transparent;
+      transition: transform .22s var(--ease), opacity .2s ease;
     }
+    .tl .pg:active { transform: scale(.86); opacity: .7; transition-duration: .1s; }
+    .tl .pg.active { transform: scale(.9); }
     .tl .pg.bump { animation: hkBump .34s var(--ease); }
     .tl .ib { width: 34px; height: 34px; }
     .tl .ib svg { width: 17px; height: 17px; }
@@ -540,7 +544,7 @@
     }
     .ib svg { display: block; width: 19px; height: 19px; transition: transform .5s var(--ease); }
     .ib:active { transform: scale(.9); transition-duration: .1s; }
-    .ib.active { background: rgba(255, 255, 255, 0.20); color: #fff; }
+    .ib.active { background: rgba(255, 255, 255, 0.20); color: #fff; transform: scale(.9); }
     .ib.gear:active svg { transform: rotate(60deg); }
     .ib.pin.on { color: #ffd54a; }
     .ib.pin.on svg .jb { fill: currentColor; fill-opacity: .28; }
@@ -570,11 +574,11 @@
       height: 52px; padding: 0 17px 0 15px; border-radius: 999px;
       color: var(--text); font: inherit; font-size: 12.5px; font-weight: 700;
       animation: hkBarIn .7s var(--ease) .12s backwards;
-      transition: color .2s var(--ease);
+      transition: color .2s var(--ease), transform .22s var(--ease);
     }
     .filt svg { display: block; width: 16px; height: 16px; opacity: .85; }
     .filt .fl { white-space: nowrap; }
-    .filt.active { color: #fff; }
+    .filt.active { color: #fff; transform: scale(calc(.94 - 0.05 * var(--p, 0))); }
     @keyframes hkCh { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
     .hlk { font-size: 13px; font-weight: 700; color: #fff; margin-top: 12px; }
     .hld { font-size: 12px; color: var(--sub); line-height: 1.5; margin-top: 3px; }
@@ -651,7 +655,8 @@
       box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
       transition: transform .22s var(--ease), background .22s var(--ease);
     }
-    .hfix:active { transform: scale(.92); }
+    .hfix:active, .hfix.active { transform: scale(.92); }
+    .hfix.active { background: rgba(60, 60, 68, 0.92); }
     .fxtop, .fxbot { position: fixed; left: 0; right: 0; pointer-events: none; z-index: 0; transition: opacity .25s ease; }
     .fxtop { top: 0; height: 64px; background: linear-gradient(to bottom, rgba(17, 17, 17, 0.75), rgba(17, 17, 17, 0)); }
     .fxbot { bottom: 0; height: 72px; background: linear-gradient(to top, rgba(17, 17, 17, 0.9), rgba(17, 17, 17, 0)); }
@@ -897,11 +902,48 @@
     .ibs.ebtn { flex: none; align-self: flex-end; width: 26px; height: 26px; margin: 0 2px 1px 4px; padding: 0; }
     .ibs.ebtn svg { width: 13px; height: 13px; }
     .item {
+      position: relative; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
       display: flex; flex-direction: column; gap: 6px; min-width: 0;
       padding: 6px; border-radius: 16px; background: rgba(255, 255, 255, 0.08);
       transition: background .3s var(--ease), transform .3s var(--ease);
     }
     .item:active { background: rgba(255, 255, 255, 0.14); transform: scale(.97); transition-duration: .12s; }
+    .item img { -webkit-touch-callout: none; -webkit-user-drag: none; }
+    .item.menu-on { z-index: 6; background: rgba(255, 255, 255, 0.16); transform: none; }
+    .info .pid { color: #fff; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .cmenu {
+      position: absolute; top: calc(100% + 6px); z-index: 7; display: flex; gap: 2px; padding: 4px;
+      border-radius: 16px; background: rgba(40, 40, 46, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+      -webkit-backdrop-filter: blur(18px) saturate(1.5); backdrop-filter: blur(18px) saturate(1.5);
+      transform-origin: 50% 0;
+    }
+    .cmb {
+      -webkit-appearance: none; appearance: none; border: 0; background: none; cursor: pointer; flex: none;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      width: 44px; padding: 6px 0 5px; border-radius: 12px; color: #fff;
+      font: inherit; font-size: 10.5px; font-weight: 600; white-space: nowrap;
+      transition: background .2s ease, transform .3s var(--ease);
+    }
+    .cmb svg { width: 16px; height: 16px; display: block; }
+    .cmb:active { background: rgba(255, 255, 255, 0.14); transform: scale(.9); transition-duration: .1s; }
+    .cmb.danger { color: #ff8f8f; }
+    .ask {
+      display: none; align-items: center; gap: 6px; transform-origin: 100% 100%;
+      padding: 6px 6px 6px 16px; border-radius: 999px; white-space: nowrap;
+      background: rgba(24, 24, 28, 0.86) !important;
+    }
+    .ask.open { display: flex; }
+    .ask.open.out { pointer-events: none; }
+    .ask .amsg { color: #fff; font-size: 13px; font-weight: 600; margin-right: 6px; }
+    .ask .abtn {
+      -webkit-appearance: none; appearance: none; border: 0; cursor: pointer; flex: none;
+      height: 32px; padding: 0 14px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14); color: #fff; font: inherit; font-size: 12.5px; font-weight: 700;
+      transition: transform .3s var(--ease);
+    }
+    .ask .abtn.yes { background: rgba(255, 255, 255, 0.92); color: #14161a; }
+    .ask .abtn:active { transform: scale(.9); transition-duration: .1s; }
     .tb {
       width: 100%; aspect-ratio: 3 / 4; border-radius: 11px; overflow: hidden;
       background: rgba(0, 0, 0, 0.28); cursor: pointer;
@@ -2513,6 +2555,7 @@
   };
 
   ICON.edit = SV('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>');
+  ICON.del = SV('<path d="M18 6 6 18M6 6l12 12"/>');
   ICON.copy = SV('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>');
   ICON.journal = SV('<path class="jb" d="M6.5 3H18v18H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3z"/><path d="M9 3v18"/><path d="M12 8h3.5M12 11.5h3.5"/>');
 
@@ -2568,6 +2611,7 @@
                 <div class="wrap" id="wrap">
           <div class="stack">
             <div class="toast pill" id="toast"></div>
+            <div class="ask pill" id="ask"></div>
             <div class="panel pill" id="panel"></div>
           </div>
           <div class="tl pill" id="tl">${tlInner(IS_READER, IS_WORK_PAGE)}</div>
@@ -3231,6 +3275,7 @@
     }
 
     function buildHistBody(body) {
+      closeCardMenu(true);
       body.textContent = '';
       const head = panel.querySelector('.hhead');
       head.querySelectorAll('.hrow').forEach(n => n.remove());
@@ -3384,39 +3429,26 @@
         const day = new Date(s.ts).toLocaleDateString('ko-KR');
         if (s.stars) dt.appendChild(starsEl(s.stars));
         dt.appendChild(el('div', 'dd', day));
-        info.append(el('div', 'ttl', s.alias || s.title || dates[s.id] || ''), dt);
+        info.append(el('div', 'ttl', s.alias || s.title || dates[s.id] || ''), el('div', 'pid', s.id), dt);
         info.addEventListener('click', () => goTo(s.id));
 
         const foot = el('div', 'foot');
         foot.append(info);
         const tb = thumbEl(s.id);
-        const fl = el('div', 'tfl');
-        const tid = el('span', 'tid', s.id);
-        tid.title = '클릭: 품번 복사';
-        tid.addEventListener('click', e => {
-          e.stopPropagation();
-          copyText(s.id).then(() => toast('품번 복사됨'));
-        });
-        const del = el('button', 'tx', '✕');
-        del.type = 'button';
-        del.title = '일지 삭제';
-        del.addEventListener('click', e => {
-          e.stopPropagation();
-          askCardDelete(tb, '일지를 삭제할까요?', () => removeCard(row, () => {
+        row.append(tb, foot);
+        // 꾹 누르면 카드 아래에 복사 · 수정 · 삭제
+        longPress(row, () => [
+          { label: '복사', icon: ICON.copy, fn: () => copyText(s.id).then(() => toast('품번 복사됨')) },
+          { label: '수정', icon: ICON.edit, fn: () => openBm(s.id, 'hist') },
+          { label: '삭제', icon: ICON.del, danger: true, fn: () => removeCard(row, () => {
             const idx = saved.findIndex(x => x.id === s.id);
             const item = savedOf(s.id);
             removeSaved(s.id);
             updateCounts();
             renderItems();
             if (item) undoToast(item, idx);
-          }));
-        });
-        fl.append(tid, del);
-        tb.appendChild(fl);
-        // 수정 버튼은 작은 동그라미로, 별점·날짜 줄 오른쪽 아래에 붙인다
-        const edit = iconBtn(ICON.edit, '일지 수정', e => { e.stopPropagation(); openBm(s.id, 'hist'); }, 'ebtn');
-        foot.append(edit);
-        row.append(tb, foot);
+          }) }
+        ]);
         box.appendChild(row);
       });
     }
@@ -3460,30 +3492,87 @@
       flipFrom(panel.querySelector(sel) || box, first, newId);
     }
 
-    // 카드 위에 "삭제할까요?" 확인을 띄운다
-    function askCardDelete(tb, msg, onYes) {
-      if (tb.querySelector('.cdel')) return;
-      const ov = el('div', 'cdel');
-      ov.addEventListener('click', e => e.stopPropagation());
-      const q = el('div', 'cq', msg);
-      const r = el('div', 'cbtns');
-      const no = el('button', 'cb', '취소');
-      const yes = el('button', 'cb yes', '삭제');
-      no.type = yes.type = 'button';
-      no.addEventListener('click', e => {
-        e.stopPropagation();
-        ov.classList.add('out');
-        setTimeout(() => ov.remove(), 180);
-      });
-      yes.addEventListener('click', e => {
-        e.stopPropagation();
-        yes.disabled = no.disabled = true;
-        onYes();
-      });
-      r.append(no, yes);
-      ov.append(q, r);
-      tb.appendChild(ov);
+    // ----- 카드 꾹 누르기 메뉴 -----
+    let cmenu = null;
+    let lpJust = false;
+    function closeCardMenu(instant) {
+      const m = cmenu;
+      cmenu = null;
+      if (!m) return;
+      m.row.classList.remove('menu-on');
+      if (instant || !m.el.animate) { m.el.remove(); return; }
+      const a = m.el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-4px) scale(.9)' }],
+        { duration: 150, easing: 'ease-in', fill: 'forwards' });
+      a.onfinish = () => m.el.remove();
     }
+    function openCardMenu(row, acts) {
+      closeCardMenu(true);
+      const m = el('div', 'cmenu');
+      acts.forEach(a => {
+        const b = el('button', 'cmb' + (a.danger ? ' danger' : ''));
+        b.type = 'button';
+        b.innerHTML = a.icon;
+        b.appendChild(el('span', '', a.label));
+        b.addEventListener('click', e => { e.stopPropagation(); closeCardMenu(); a.fn(); });
+        m.appendChild(b);
+      });
+      row.classList.add('menu-on');
+      row.appendChild(m);
+      cmenu = { el: m, row, at: performance.now() };
+      // 카드 가운데 아래에 두되, 목록 밖으로 나가지 않게 좌우를 맞춘다
+      const body = row.closest('.hbody');
+      const rr = row.getBoundingClientRect();
+      const br = body ? body.getBoundingClientRect() : rr;
+      const w = m.offsetWidth;
+      let left = rr.width / 2 - w / 2;
+      left = Math.max(br.left + 4 - rr.left, Math.min(br.right - 4 - rr.left - w, left));
+      m.style.left = left + 'px';
+      m.style.transformOrigin = (rr.width / 2 - left) + 'px 0';
+      if (m.animate) m.animate([{ opacity: 0, transform: 'translateY(-6px) scale(.8)' }, { opacity: 1, transform: 'none' }],
+        { duration: 320, easing: SWAP_EASE });
+      // 아래가 가려지면 목록을 살짝 올려 보여 준다
+      if (body) {
+        const ft = panel.querySelector('.jfoot');
+        const limit = br.bottom - (ft ? ft.offsetHeight + 16 : 8);
+        const mb = m.getBoundingClientRect().bottom;
+        if (mb > limit) body.scrollBy({ top: mb - limit, behavior: 'smooth' });
+      }
+    }
+    function longPress(row, getActs) {
+      let t = 0, x0 = 0, y0 = 0;
+      const cancel = () => clearTimeout(t);
+      row.addEventListener('pointerdown', e => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (e.target.closest && e.target.closest('.cmenu')) return;
+        x0 = e.clientX;
+        y0 = e.clientY;
+        clearTimeout(t);
+        t = setTimeout(() => {
+          lpJust = true;
+          try { if (navigator.vibrate) navigator.vibrate(10); } catch (err) {}
+          openCardMenu(row, getActs());
+        }, 420);
+      });
+      row.addEventListener('pointermove', e => {
+        if (Math.abs(e.clientX - x0) > 8 || Math.abs(e.clientY - y0) > 8) cancel();
+      });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => row.addEventListener(ev, cancel));
+      row.addEventListener('contextmenu', e => e.preventDefault());
+    }
+    // 꾹 누른 뒤 손을 뗄 때 생기는 클릭은 무시하고, 메뉴가 떠 있을 때 다른 곳을 누르면 메뉴만 닫는다
+    panel.addEventListener('pointerdown', e => {
+      if (!(e.target.closest && e.target.closest('.cmenu'))) lpJust = false;
+    }, true);
+    panel.addEventListener('click', e => {
+      if (lpJust) { lpJust = false; e.preventDefault(); e.stopPropagation(); return; }
+      if (!cmenu) return;
+      if (e.composedPath().includes(cmenu.el)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      closeCardMenu();
+    }, true);
+    // 메뉴를 보여 주려고 목록을 올리는 동안의 스크롤은 무시하고, 사용자가 스크롤할 때만 닫는다
+    panel.addEventListener('scroll', () => { if (cmenu && performance.now() - cmenu.at > 700) closeCardMenu(); }, true);
 
     // 카드를 줄이며 지운 뒤, 나머지 카드는 원래 자리에서 새 자리로 미끄러지게 옮긴다
     function removeCard(row, apply) {
@@ -3527,12 +3616,14 @@
         info.addEventListener('click', () => goTo(w.id));
 
         const tb = thumbEl(w.id);
-        const del = el('button', 'xdel', '✕');
-        del.type = 'button';
-        del.title = '기록 삭제';
-        del.addEventListener('click', e => {
-          e.stopPropagation();
-          askCardDelete(tb, '기록을 삭제할까요?', () => removeCard(row, () => {
+        const foot = el('div', 'foot');
+        foot.append(info);
+        row.append(tb, foot);
+        // 꾹 누르면 카드 아래에 복사 · 일지(수정) · 삭제
+        longPress(row, () => [
+          { label: '복사', icon: ICON.copy, fn: () => copyText(w.id).then(() => toast('품번 복사됨')) },
+          { label: isSaved(w.id) ? '수정' : '일지', icon: ICON.edit, fn: () => openBm(w.id, 'hist') },
+          { label: '삭제', icon: ICON.del, danger: true, fn: () => removeCard(row, () => {
             const idx = watched.findIndex(x => x.id === w.id);
             const item = idx >= 0 ? watched[idx] : null;
             watched = watched.filter(x => x.id !== w.id);
@@ -3545,13 +3636,8 @@
               saveWatched();
               if (panelMode === 'hist' && histMode === 'recent') reflowList('#hitems', renderHistItems, item.id);
             } });
-          }));
-        });
-        tb.appendChild(del);
-
-        const foot = el('div', 'foot');
-        foot.append(info);
-        row.append(tb, foot);
+          }) }
+        ]);
         box.appendChild(row);
       });
     }
@@ -3713,16 +3799,18 @@
         ['koreanOnly', 'Only Korean'],
         ['infinite', 'Unlimited scroll']
       ].forEach(([key, label]) => {
-        const t = el('div', 'tog' + (settings[key] ? ' on' : ''), label);
+        const t = el('div', 'tog' + (key in pendingSet ? (pendingSet[key] ? ' on' : '') : (settings[key] ? ' on' : '')), label);
         t.setAttribute('role', 'switch');
+        t.dataset.k = key;
         t.addEventListener('click', () => {
-          const next = !settings[key];
           if (['koreanOnly', 'infinite'].includes(key)) {
-            askConfirm('새로고침해서 적용할까요?', () => {
-              settings[key] = next;
-              saveSettings();
-              location.reload();
-            }, () => setPanel('set'));
+            // 토글은 바로 바뀌고, 저장된 값과 달라지면 위에 "새로고침할까요?" 팝업이 뜬다
+            const next = !t.classList.contains('on');
+            t.classList.toggle('on', next);
+            if (next === !!settings[key]) delete pendingSet[key];
+            else pendingSet[key] = next;
+            if (Object.keys(pendingSet).length) showAsk();
+            else hideAsk();
             return;
           }
           settings[key] = next;
@@ -3741,16 +3829,48 @@
       );
       panel.appendChild(br);
 
-      panel.appendChild(el('div', 'lbl', '도구'));
-      const tr = el('div', 'row');
-      tr.style.justifyContent = 'space-between';
+      const fab = el('div', 'fabwrap');
       const hb = el('button', 'helpfab', '?');
       hb.type = 'button';
       hb.title = '기능 설명';
       hb.setAttribute('aria-label', '기능 설명');
       hb.addEventListener('click', () => setPanel('help'));
-      tr.append(btn('진단 로그 보기', '', () => setPanel('log')), hb);
-      panel.appendChild(tr);
+      fab.appendChild(hb);
+      panel.appendChild(fab);
+    }
+
+    // ----- 새로고침이 필요한 설정 확인 팝업 -----
+    const pendingSet = {};
+    function hideAsk() {
+      const a = $('#ask');
+      if (a && a.classList.contains('open')) popClose(a, null);
+    }
+    function revertPending() {
+      Object.keys(pendingSet).forEach(k => {
+        const t = panel.querySelector('.tog[data-k="' + k + '"]');
+        if (t) t.classList.toggle('on', !!settings[k]);
+        delete pendingSet[k];
+      });
+      hideAsk();
+    }
+    function showAsk() {
+      const a = $('#ask');
+      if (!a) return;
+      if (a.classList.contains('open') && !a.classList.contains('out')) return;
+      a.textContent = '';
+      a.appendChild(el('span', 'amsg', '새로고침해서 적용할까요?'));
+      const no = el('button', 'abtn', '취소');
+      const yes = el('button', 'abtn yes', '새로고침');
+      no.type = yes.type = 'button';
+      no.addEventListener('click', e => { e.stopPropagation(); revertPending(); });
+      yes.addEventListener('click', e => {
+        e.stopPropagation();
+        Object.assign(settings, pendingSet);
+        saveSettings();
+        location.reload();
+      });
+      a.append(no, yes);
+      popOpen(a, null);
     }
 
     function renderHelp() {
@@ -3766,12 +3886,13 @@
           ['정렬 필터', '목록 정렬 방식을 바꿉니다.'],
           ['하단 알약', '품번 복사, 별점, 검색, 최근·일지 목록, 설정을 엽니다.'],
           ['별 5개', '작품 화면 하단 알약의 별을 누르면 별점이 매겨지고, 위로 뜨는 창에서 별명을 정해 저장하면 일지에 남습니다.'],
+          ['기록·일지 카드 꾹 누르기', '카드 아래에 복사 · 수정 · 삭제 메뉴가 뜹니다. 지운 것은 되돌리기로 살릴 수 있습니다.'],
           ['일지 목록', '아래쪽 막대에서 작성일순·별점순으로 정렬합니다. 별점순일 때는 별점마다 구분선이 들어가고, 구분선을 누르면 그 별점의 일지를 접거나 펼칩니다. 지운 일지는 되돌리기로 살릴 수 있습니다.']
         ]],
         ['리더', [
           ['왼쪽 탭 · ←', '다음 페이지로 넘어갑니다.'],
           ['오른쪽 탭 · →', '이전 페이지로 넘어갑니다.'],
-          ['드래그', '손가락을 따라 페이지가 움직입니다. 오른쪽으로 끌면 다음, 왼쪽으로 끌면 이전입니다. 화면 폭의 22% 이상 끌거나 빠르게 밀면 넘어갑니다.'],
+          ['드래그', '손가락을 따라 페이지가 움직입니다. 오른쪽으로 끌면 다음, 왼쪽으로 끌면 이전입니다. 화면 폭의 12% 이상 끌거나 가볍게 밀면 넘어갑니다.'],
           ['두 손가락', '벌려서 확대하고 모아서 줄입니다. 확대한 채로 두 손가락을 움직이면 이동도 함께 됩니다.'],
           ['확대 상태', '한 손가락으로 끌면 이동합니다. 확대 중에는 탭으로 넘어가지 않습니다.'],
           ['복구 버튼', '누르면 가운데 정렬된 1배로 돌아옵니다. 1배보다 작게 줄인 뒤 손을 떼도 1배로 돌아옵니다.'],
@@ -3781,10 +3902,9 @@
         ]],
         ['설정', [
           ['Pre Load', '다음 페이지를 미리 받습니다. 목록에서는 화면에 보이는 작품의 1페이지를 미리 받습니다.'],
-          ['Only Korean', '한국어 작품만 보여줍니다. 바꾸면 새로고침합니다.'],
-          ['Unlimited scroll', '목록을 끝없이 이어 붙입니다. 바꾸면 새로고침합니다.'],
-          ['일지 내보내기·가져오기', '일지를 JSON으로 복사하거나 붙여넣습니다.'],
-          ['진단 로그 보기', '미리 받기 실패 같은 문제를 확인합니다.']
+          ['Only Korean', '한국어 작품만 보여줍니다. 바꾸면 위에 뜨는 팝업에서 새로고침해 적용합니다.'],
+          ['Unlimited scroll', '목록을 끝없이 이어 붙입니다. 바꾸면 위에 뜨는 팝업에서 새로고침해 적용합니다.'],
+          ['일지 내보내기·가져오기', '일지를 JSON으로 복사하거나 붙여넣습니다.']
         ]]
       ];
       sections.forEach(([title, items]) => {
@@ -3796,21 +3916,6 @@
         });
         panel.appendChild(box);
       });
-    }
-
-    function renderLog() {
-      panel.textContent = '';
-      panel.appendChild(el('div', 'lbl', '진단 정보'));
-      let txt;
-      try { txt = diagText(); } catch (e) { txt = '진단 정보를 만드는 중 오류: ' + (e && e.message ? e.message : e); }
-      panel.appendChild(el('pre', 'diag', txt));
-      const row = el('div', 'row');
-      row.style.marginTop = '10px';
-      row.append(
-        btn('새로고침', 'sm', renderLog),
-        btn('복사', 'primary', () => copyText(diagText()).then(() => toast('복사됨')))
-      );
-      panel.appendChild(row);
     }
 
     let pvTimer = 0, pvSig = '';
@@ -3832,6 +3937,16 @@
       ].join('|');
     }
 
+    function pvCell(idx) {
+      const c = el('div', 'pvc');
+      c.appendChild(el('span', 'pvn', String(idx + 1)));
+      c.addEventListener('click', () => {
+        setPanel(null, true);
+        if (idx + 1 !== fxPage()) turnTo(idx + 1);
+      });
+      return c;
+    }
+
     function pvPaint() {
       const head = panel.querySelector('#pvHead');
       const grid = panel.querySelector('#pvGrid');
@@ -3844,26 +3959,38 @@
       const cur = fxPage();
       head.textContent = '미리 받아 둔 페이지 ' + preDone.size + ' / ' + total + '  (현재 ' + cur + 'p)';
 
-      grid.textContent = '';
+      if (grid.children.length !== total) {
+        grid.textContent = '';
+        for (let i = 0; i < total; i++) grid.appendChild(pvCell(i));
+      }
       for (let i = 0; i < total; i++) {
-        const idx = i;
-        const isCur = idx + 1 === cur;
-        const u = preSmall.get(idx) || preBlob.get(idx) || (isCur ? pvCurSrc() : '');
-        const c = el('div', 'pvc' + (preDone.has(idx) || u ? ' ok' : '') + (isCur ? ' cur' : ''));
+        const c = grid.children[i];
+        const isCur = i + 1 === cur;
+        const u = preSmall.get(i) || preBlob.get(i) || (isCur ? pvCurSrc() : '');
+        const lab = u ? '' : (preBusy.has(i) ? '받는 중' : '대기');
+        const k = u + '|' + lab + '|' + isCur + '|' + preDone.has(i);
+        if (c._k === k) continue;
+        c._k = k;
+        c.classList.toggle('ok', !!(preDone.has(i) || u));
+        c.classList.toggle('cur', isCur);
+        let im = c.querySelector('img');
+        let w = c.querySelector('.pvw');
         if (u) {
-          const im = document.createElement('img');
-          im.alt = '';
-          im.src = u;
-          c.appendChild(im);
+          if (w) w.remove();
+          if (!im) {
+            im = document.createElement('img');
+            im.alt = '';
+            c.insertBefore(im, c.firstChild);
+          }
+          if (im.getAttribute('src') !== u) im.src = u;
         } else {
-          c.appendChild(el('span', 'pvw', preBusy.has(idx) ? '받는 중' : '대기'));
+          if (im) im.remove();
+          if (!w) {
+            w = el('span', 'pvw');
+            c.insertBefore(w, c.firstChild);
+          }
+          w.textContent = lab;
         }
-        c.appendChild(el('span', 'pvn', String(idx + 1)));
-        c.addEventListener('click', () => {
-          setPanel(null, true);
-          if (idx + 1 !== fxPage()) turnTo(idx + 1);
-        });
-        grid.appendChild(c);
       }
       return true;
     }
@@ -3881,6 +4008,11 @@
 
       pvSig = '';
       pvPaint();
+      // 처음 열 때 지금 보는 페이지가 가운데 오게 한다
+      requestAnimationFrame(() => {
+        const curCell = grid.querySelector('.pvc.cur');
+        if (curCell && panelMode === 'preview') panel.scrollTop = Math.max(0, curCell.offsetTop - panel.offsetTop - panel.clientHeight / 2 + curCell.offsetHeight / 2);
+      });
 
       clearInterval(pvTimer);
       pvTimer = setInterval(() => {
@@ -3939,7 +4071,7 @@
     }
 
     const btnFor = {
-      search: '#searchBtn', hist: '#histBtn', set: '#setBtn', log: '#setBtn',
+      search: '#searchBtn', hist: '#histBtn', set: '#setBtn',
       info: '#infoBtn', sort: '#filt', bm: '#pstars', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn'
     };
     // ⋯ 상세정보: 팝업을 작품 카드 안에 붙여서, 스크롤해도 카드와 한 몸처럼 움직이게 한다
@@ -4056,7 +4188,7 @@
     }
     const RENDERERS = {
       search: renderSearch, hist: renderHist, set: renderSettings,
-      log: renderLog, info: renderInfo, sort: renderSort, bm: renderBm,
+      info: renderInfo, sort: renderSort, bm: renderBm,
       preview: renderPreview, home: renderHomeChoice, confirm: renderConfirm, help: renderHelp
     };
 
@@ -4066,6 +4198,8 @@
       const prev = panelMode;
       panelMode = mode;
       if (prev === 'bm' && mode !== 'bm') { bmSetStars = null; updateCounts(); }
+      if (prev === 'set' && mode !== 'set') revertPending();
+      closeCardMenu(true);
 
       const activeSel = mode ? btnFor[mode] : null;
       Object.values(btnFor).forEach(sel => {
@@ -4597,7 +4731,7 @@
   const TURN_DIST = 0.42;
   const TURN_FLIP = false;
   const DRAG_START = 8;
-  const DRAG_CUT = 0.22;
+  const DRAG_CUT = 0.12;
 
   let coverEl = null;
   let turnSeq = 0;
@@ -5031,7 +5165,7 @@
     const W = window.innerWidth, d = drag.dir;
     if (drag.edge) { dragSnap(); press(0, -4); return; }
     const progress = dx * d;
-    const flick = v * d > 0.3 && progress > 6;
+    const flick = v * d > 0.2 && progress > 4;
     const want = progress > W * DRAG_CUT || flick;
     if (!want) { dragSnap(); press(0, -4); return; }
     if (!drag.inL) { dragSnap(); turn(d); return; }
@@ -5353,51 +5487,6 @@
     });
     mo.observe(document.body, { childList: true, subtree: true });
     setTimeout(() => mo.disconnect(), 8000);
-  }
-
-  function diagText() {
-    const w = W();
-    const g = w.galleryinfo;
-    const im = findReaderImg();
-    const lines = [
-      '버전: ' + VERSION,
-      '페이지: ' + location.pathname + location.hash,
-      '리더: ' + (IS_READER ? '예' : '아니오'),
-      'galleryinfo: ' + (g ? '있음 (id ' + g.id + ', ' + ((g.files && g.files.length) || 0) + '장)' : '없음'),
-      'url_from_url_from_hash: ' + typeof w.url_from_url_from_hash,
-      '실제로 받아 둔 페이지: ' + (Array.from(preDone).map(i => i + 1).sort((a, b) => a - b).join(', ') || '없음'),
-      '받는 중: ' + (Array.from(preBusy.keys()).map(i => i + 1).join(', ') || '없음'),
-      '현재 리더 이미지 주소: ' + (im ? (im.getAttribute('src') || '(src 없음)') : '없음'),
-      '진행 중 넘김: ' + activeTurns,
-      ''
-    ];
-    return lines.join('\n') + '\n' + structDump() + '\n\n[로그]\n' +
-      (hkLog.length ? hkLog.join('\n') : '(기록 없음)');
-  }
-
-  function structDump() {
-    const cls = e => (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : '');
-    const desc = e => e.tagName + (e.id ? '#' + e.id : '') + cls(e);
-    const out = ['[구조]'];
-    out.push('body 자식: ' + Array.from(document.body ? document.body.children : []).slice(0, 15).map(desc).join(' | '));
-    const bodyBg = document.body ? getComputedStyle(document.body).backgroundColor : '';
-    const htmlBg = getComputedStyle(document.documentElement).backgroundColor;
-    out.push('배경색 computed: html=' + htmlBg + ' body=' + bodyBg);
-    const gc = document.querySelector('.gallery-content');
-    if (gc) {
-      out.push('gallery-content 칸 수: ' + gc.children.length);
-      if (gc.children[0]) out.push('첫 칸 HTML: ' + gc.children[0].outerHTML.slice(0, 500));
-      const chain = [];
-      for (let n = gc.parentElement; n && n !== document.documentElement && chain.length < 8; n = n.parentElement) {
-        chain.push(desc(n) + '[bg=' + getComputedStyle(n).backgroundColor + ']');
-      }
-      out.push('gallery-content 조상: ' + chain.join(' < '));
-    }
-    const imgs = Array.from(document.images).slice(0, 12).map(i =>
-      desc(i) + ' src=' + (i.getAttribute('src') || '').slice(0, 90) +
-      ' loaded=' + i.complete + ' w=' + i.naturalWidth);
-    out.push('img (최대 12):');
-    return out.concat(imgs).join('\n');
   }
 
   // 목록 페이지: 첫 정리(run)가 끝날 때까지 원래 히토미 화면을 숨겨서 겹쳐 보이지 않게 한다
