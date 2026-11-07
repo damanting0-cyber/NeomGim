@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.11.1
+// @version      1.12.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.11.1';
+  const VERSION = '1.12.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -518,6 +518,10 @@
     }
     @keyframes seenIn { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
 
+    /* 하단 버튼 묶음의 빈 공간은 손가락이 그대로 아래 페이지에 닿게 한다 (빈 곳에서 시작한 끌기도 넘김이 되도록) */
+    .wrap { pointer-events: none; }
+    .wrap > .tl, .wrap > .bottom > * { pointer-events: auto; }
+    .bottom { pointer-events: none; }
     .wrap {
       position: fixed; right: 16px; bottom: 16px; z-index: 2;
       display: flex; flex-direction: column; align-items: flex-end; gap: 12px;
@@ -3976,7 +3980,7 @@
         [ICON.sort, '정렬', '왼쪽 아래 버튼으로 최신 · 인기 순을 바꿔요.']
       ],
       reader: [
-        [HI.tap, '이미지 누르기', '누르는 순간 넘어가요. 왼쪽은 다음, 오른쪽은 이전. 이미지 밖은 눌러도 그대로예요.'],
+        [HI.tap, '이미지 누르기', '왼쪽은 다음, 오른쪽은 이전 페이지예요. 이미지 밖은 눌러도 그대로예요.'],
         [HI.swipe, '끌기', '손가락을 따라오고, 조금만 밀어도 넘어가요. 키보드 ← → 도 돼요.'],
         [HI.pinch, '두 손가락', '확대하고 이동해요. ↺ 버튼을 누르면 원래 크기로 돌아와요.'],
         [HI.grid, '1 / N', '미리 받은 페이지를 보고 바로 그 페이지로 가요.'],
@@ -4011,6 +4015,28 @@
       });
     }
 
+    // 지금 카드 묶음이 옆으로 빠지며 흐려지고, 새 묶음이 반대쪽에서 들어온다 (팝업 높이도 함께)
+    let helpSwapT = 0;
+    function swapHelp(box, dir) {
+      const my = ++swapSeq;
+      clearTimeout(swapT);
+      clearTimeout(helpSwapT);
+      const h0 = panel.offsetHeight;
+      panel.style.overflow = 'hidden';
+      panel.style.height = h0 + 'px';
+      box.getAnimations().forEach(a => a.cancel());
+      if (box.animate) box.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${-dir * 18}px)` }],
+        { duration: 140, easing: 'ease-in', fill: 'forwards' });
+      helpSwapT = setTimeout(() => {
+        if (my !== swapSeq) return;
+        box.getAnimations().forEach(a => a.cancel());
+        paintHelp(box);
+        growFrom(h0);
+        if (box.animate) box.animate([{ opacity: 0, transform: `translateX(${dir * 18}px)` }, { opacity: 1, transform: 'none' }],
+          { duration: 320, easing: SWAP_EASE, fill: 'backwards' });
+      }, 140);
+    }
+
     function renderHelp() {
       panel.textContent = '';
       const top = el('div', 'hhd');
@@ -4019,9 +4045,11 @@
       back.title = '설정으로';
       back.addEventListener('click', () => setPanel('set'));
       const box = el('div', 'hcards');
+      const order = ['list', 'reader', 'journal', 'set'];
       const seg = segCtl([['list', '목록'], ['reader', '리더'], ['journal', '일지'], ['set', '설정']], helpTab, k => {
+        const dir = order.indexOf(k) > order.indexOf(helpTab) ? 1 : -1;
         helpTab = k;
-        growRender(() => paintHelp(box));
+        swapHelp(box, dir);
       }, 'sm hseg');
       top.append(back, seg);
       panel.append(top, box);
@@ -4980,7 +5008,8 @@
   const ownPages = [];
   const markOwn = n => { ownPages.push(n); if (ownPages.length > 8) ownPages.shift(); };
 
-  const press = (t, kick) => { if (window.__hkPress) window.__hkPress(t, kick); };
+  // 넘길 때 하단 버튼이 눌리듯 작아지던 효과는 없앴다
+  const press = () => {};
 
   function fitLayer(src, nw, nh) {
     const vw = window.innerWidth, vh = window.innerHeight;
@@ -5307,37 +5336,6 @@
     return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
   }
 
-  // 누르는 순간 시작한 넘김을 되감고, 원래 페이지에서 손가락을 따라오는 끌기로 바꾼다
-  function tapToDrag(dir) {
-    const orig = drag.orig;
-    let origLayer = null;
-    if (holdLayer) {
-      origLayer = holdLayer;
-      holdLayer = null;
-    } else {
-      leaving.forEach(l => { origLayer = l; });
-      if (origLayer) {
-        clearTimeout(origLayer._rmT);
-        leaving.delete(origLayer);
-        syncActive();
-      }
-    }
-    const tapLayer = curLayer;
-    curLayer = null;
-    if (tapLayer && tapLayer !== origLayer) {
-      freezeLayer(tapLayer);
-      try { tapLayer.remove(); } catch (e) {}
-    }
-    ++turnSeq;
-    hideSpin();
-    if (fxPage() !== orig) {
-      markOwn(orig);
-      location.hash = '#' + orig;
-    }
-    if (origLayer) { freezeLayer(origLayer); curLayer = origLayer; }
-    dragBegin(dir);
-  }
-
   function dragAddIn() {
     if (drag.inL || !drag.files) return;
     const im = pageReady(drag.next - 1);
@@ -5493,8 +5491,6 @@
       suppressClick = false;
       if (pts.size === 2) {
         if (drag.mode === 2) dragSnap(drag.dx);
-        // 첫 손가락에 이미 넘겼는데 두 손가락(확대)이었다면 원래 페이지로 돌려 놓는다
-        if (drag.mode === 4 && fxPage() !== drag.orig) turnTo(drag.orig);
         drag.mode = 0;
         const [a, b] = [...pts.values()];
         pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: zoom, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, px0: panX, py0: panY };
@@ -5512,15 +5508,6 @@
         drag.px0 = panX;
         drag.py0 = panY;
         drag.mode = 0;
-        // 손가락이 닿는 순간 바로 넘긴다 (손을 뗄 때까지 기다리지 않음). 확대 중에는 넘기지 않는다
-        const path = e.composedPath();
-        if (zoom <= 1.01 && (isImagePath(path) || !isInteractive(path)) && onImage(e.clientX, e.clientY)) {
-          drag.orig = fxPage();
-          drag.tapDir = e.clientX < window.innerWidth / 2 ? 1 : -1;
-          drag.mode = 4;
-          suppressClick = true;
-          turn(drag.tapDir);
-        }
       }
     }, { capture: true, passive: true });
 
@@ -5540,14 +5527,6 @@
       }
       if (pts.size !== 1 || e.pointerId !== drag.id) return;
       const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
-      if (drag.mode === 4) {
-        // 누르는 순간 넘겼지만 그대로 옆으로 끌기 시작하면, 넘김을 되감고 원래 페이지에서 손가락을 따라오게 한다
-        if (Math.abs(dx) < DRAG_START && Math.abs(dy) < DRAG_START) return;
-        if (Math.abs(dx) > Math.abs(dy) * 1.2) {
-          tapToDrag(dx > 0 ? 1 : -1);
-          drag.mode = 2;
-        } else { drag.mode = 3; return; }
-      }
       if (drag.mode === 0) {
         if (Math.abs(dx) < DRAG_START && Math.abs(dy) < DRAG_START) return;
         suppressClick = true;
