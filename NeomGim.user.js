@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.10.0
+// @version      1.10.1
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.10.0';
+  const VERSION = '1.10.1';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -129,6 +129,17 @@
     else document.addEventListener('DOMContentLoaded', mountOffButton);
     return;
   }
+
+  // 새로고침 직후 원래 히토미 화면이 잠깐 보이지 않도록, 스크립트가 시작되자마자 (모든 페이지에서) 화면을 가린다.
+  // 첫 정리가 끝나면 걷히고, 혹시 문제가 생겨도 3초 뒤에는 저절로 걷힌다.
+  try {
+    const bootCss = document.createElement('style');
+    bootCss.id = 'hk-boot-css';
+    bootCss.textContent = 'html.hk-boot{background:#111111!important}html.hk-boot body{opacity:0!important}';
+    (document.head || document.documentElement).appendChild(bootCss);
+    document.documentElement.classList.add('hk-boot');
+    setTimeout(() => { try { document.documentElement.classList.remove('hk-boot'); } catch (e) {} }, 3000);
+  } catch (e) {}
 
   function redirectTargetFor(path) {
     if (path === '/' || path === '/index.html') return KOREAN_LINK;
@@ -5711,12 +5722,8 @@
     setTimeout(() => mo.disconnect(), 8000);
   }
 
-  // 목록 페이지: 첫 정리(run)가 끝날 때까지 원래 히토미 화면을 숨겨서 겹쳐 보이지 않게 한다
+  // 첫 정리(run)가 끝날 때까지 원래 히토미 화면을 숨겨 둔 것(맨 위 hk-boot)을 걷는다
   function endBoot() { try { document.documentElement.classList.remove('hk-boot'); } catch (e) {} }
-  if (!IS_WORK_PAGE) {
-    onRoot(() => document.documentElement.classList.add('hk-boot'));
-    setTimeout(endBoot, 3000);
-  }
   injectSiteCss();
   injectFxCss();
   if (IS_READER) initReaderInput();
