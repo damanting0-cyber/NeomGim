@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.9.2
+// @version      1.10.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.9.2';
+  const VERSION = '1.10.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -41,6 +41,7 @@
     hist: 'hk_hist',
     terms: 'hk_terms',
     dates: 'hk_dates',
+    block: 'hk_block',
   };
 
   const hkLog = [];
@@ -81,6 +82,7 @@
     infinite: true,
     preload: true,
     mergeTitles: true,
+    blockOn: true,
     jSort: 'date',
   };
   const settings = Object.assign({}, SETTING_DEFAULTS, store.get(KEY.settings, {}));
@@ -146,6 +148,13 @@
 
   let watched = store.get(KEY.watched, []);
   const saveWatched = () => store.set(KEY.watched, watched);
+
+  // 차단 목록: 작품(품번·제목)과 작가·그룹 이름
+  let blocks = store.get(KEY.block, null);
+  if (!blocks || typeof blocks !== 'object') blocks = {};
+  if (!Array.isArray(blocks.works)) blocks.works = [];
+  if (!Array.isArray(blocks.artists)) blocks.artists = [];
+  const saveBlocks = () => store.set(KEY.block, blocks);
 
   let thumbs = store.get(KEY.thumbs, {});
   let thumbsCount = Object.keys(thumbs).length;
@@ -300,7 +309,7 @@
     #search-button, button#search, .search-button, input[type="submit"][value="Search" i] { display: none !important; }
     .search-content, #search-content, #search-form, .search-bar, #search-box,
     .search-box, #query-input, #search-options { display: none !important; }
-    .gallery-content > div.hk-hidden, .gallery-content > div.hk-artsoff, .gallery-content > div.hk-merged { display: none !important; }
+    .gallery-content > div.hk-hidden, .gallery-content > div.hk-artsoff, .gallery-content > div.hk-merged, .gallery-content > div.hk-blocked { display: none !important; }
     .gallery-content > .hk-stray { display: none !important; }
     .hk-vanish { display: none !important; }
     .gallery-content > div.hk-metaon { z-index: 30 !important; }
@@ -371,7 +380,9 @@
     @keyframes hkCardIn { from { opacity: 0; } to { opacity: 1; } }
     .thumb { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: block; cursor: pointer; }
     .thumb picture { display: block !important; width: 100% !important; height: 100% !important; }
+    .card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
     .thumb img {
+      -webkit-touch-callout: none !important; -webkit-user-drag: none !important;
       display: block !important; width: 100% !important; height: 100% !important;
       max-width: none !important; max-height: none !important; margin: 0 !important;
       object-fit: cover !important; border: 0 !important;
@@ -883,6 +894,39 @@
     .sdiv .st { display: inline-flex; }
     .sdiv .st svg { width: 13px; height: 13px; fill: none; }
     .sdiv .st svg.on { fill: currentColor; }
+
+    .chip.bad { background: rgba(255, 90, 90, 0.18); border-color: rgba(255, 120, 120, 0.45); }
+    .bkl { display: flex; flex-direction: column; gap: 6px; }
+    .bkb {
+      -webkit-appearance: none; appearance: none; cursor: pointer; width: 100%;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 10px 14px; border-radius: 14px; border: 1px solid rgba(255, 120, 120, 0.35);
+      background: rgba(255, 90, 90, 0.14); color: #fff; font: inherit; font-size: 13px; font-weight: 700; text-align: left;
+      transition: transform .3s var(--ease), background .2s ease;
+    }
+    .bkb:active { transform: scale(.97); background: rgba(255, 90, 90, 0.26); transition-duration: .1s; }
+    .bkb .bkt { flex: none; }
+    .bkb .bks { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255, 255, 255, 0.7); font-size: 12px; font-weight: 600; }
+    .srow.bwr { gap: 8px; }
+    .srow .bwid { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .srow .bwt { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--sub); }
+    .srow .bwx { flex: none; color: var(--sub); }
+
+    .hhd { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .btn.hback { flex: none; width: 34px; padding: 0; font-size: 15px; }
+    .seg.hseg { flex: 1 1 auto; margin: 0; }
+    .seg.hseg .segb { flex: 1 1 0; padding: 0 4px; }
+    .hcards { display: flex; flex-direction: column; gap: 6px; }
+    .hcard { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: rgba(255, 255, 255, 0.07); }
+    .hic {
+      flex: none; width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 14px;
+    }
+    .hic svg { display: block; width: 17px; height: 17px; }
+    .htx { min-width: 0; }
+    .hct { color: #fff; font-size: 13px; font-weight: 700; }
+    .hcd { margin-top: 2px; color: var(--sub); font-size: 12px; line-height: 1.45; }
 
     .row { display: flex; align-items: center; gap: 6px; }
     .row + .row, .row + .list, .lbl + .row, .row + .lbl, .hint + .lbl { margin-top: 8px; }
@@ -1613,6 +1657,7 @@
     if (!dates[id]) wantDate(id);
 
     cardHost.dataset.hkId = id;
+    cardHost._hkInfo = { id, title, meta: meta || { artists: [], groups: [], tags: [] } };
     if (pgReady.has(String(id))) sh.querySelector('.card').classList.add('ready');
     sh.querySelector('.card').classList.toggle('viewed', seenIds.has(id));
 
@@ -1729,7 +1774,7 @@
       hosts.push(host);
       const key = card.dataset.hkKey;
       let hide = false;
-      if (settings.mergeTitles && key && !card.classList.contains('hk-hidden') && !card.classList.contains('hk-artsoff')) {
+      if (settings.mergeTitles && key && !card.classList.contains('hk-hidden') && !card.classList.contains('hk-artsoff') && !card.classList.contains('hk-blocked')) {
         const o = { id: host.dataset.hkId, date: card.dataset.hkDate || '' };
         const g = groups.get(key);
         if (g) { g.ids.push(o); hide = true; }
@@ -1762,6 +1807,21 @@
   });
 
   const TAXO_RE = /^\/(tag|artist|group|series|character)\/(.+)-[a-z]+\.html/i;
+
+  function isBlockedCard(card) {
+    if (settings.blockOn === false) return false;
+    const host = card.querySelector('.hk-card-host');
+    const id = (host && host.dataset.hkId) || cardWorkId(card);
+    if (id && blocks.works.some(w => w.id === id)) return true;
+    if (!blocks.artists.length) return false;
+    const m = readCardMeta(card);
+    return m.artists.concat(m.groups).some(a => blocks.artists.indexOf(normArtName(a)) >= 0);
+  }
+  function applyBlocks() {
+    document.querySelectorAll('.gallery-content > div[data-hk-done]').forEach(card => {
+      card.classList.toggle('hk-blocked', isBlockedCard(card));
+    });
+  }
   const CARD_META = new WeakMap();
   const normArtName = s => String(s || '').toLowerCase().replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -2183,7 +2243,7 @@
     gc.querySelectorAll(':scope > div').forEach(card => {
       if (card.dataset.hkWarm) return;
       if (card.classList.contains('hk-artsoff') || card.classList.contains('hk-hidden') ||
-          card.classList.contains('hk-stray')) return;
+          card.classList.contains('hk-stray') || card.classList.contains('hk-blocked')) return;
       card.dataset.hkWarm = '1';
       warm.io.observe(card);
     });
@@ -3560,9 +3620,8 @@
       row.addEventListener('contextmenu', e => e.preventDefault());
     }
     // 꾹 누른 뒤 손을 뗄 때 생기는 클릭은 무시하고, 메뉴가 떠 있을 때 다른 곳을 누르면 메뉴만 닫는다
-    panel.addEventListener('pointerdown', e => {
-      if (!(e.target.closest && e.target.closest('.cmenu'))) lpJust = false;
-    }, true);
+    // 새로 손가락을 대면 '꾹 누른 직후' 표시를 지운다 (메뉴 버튼을 누를 때도) → 메뉴 버튼이 한 번에 눌린다
+    panel.addEventListener('pointerdown', () => { lpJust = false; }, true);
     panel.addEventListener('click', e => {
       if (lpJust) { lpJust = false; e.preventDefault(); e.stopPropagation(); return; }
       if (!cmenu) return;
@@ -3797,7 +3856,8 @@
       [
         ['preload', 'Pre Load'],
         ['koreanOnly', 'Only Korean'],
-        ['infinite', 'Unlimited scroll']
+        ['infinite', 'Unlimited scroll'],
+        ['blockOn', 'Block']
       ].forEach(([key, label]) => {
         const t = el('div', 'tog' + (key in pendingSet ? (pendingSet[key] ? ' on' : '') : (settings[key] ? ' on' : '')), label);
         t.setAttribute('role', 'switch');
@@ -3813,30 +3873,35 @@
             else hideAsk();
             return;
           }
-          settings[key] = next;
+          settings[key] = !settings[key];
           saveSettings();
           t.classList.toggle('on', !!settings[key]);
+          if (key === 'blockOn') { applyBlocks(); mergeDuplicates(); }
         });
         grid.appendChild(t);
       });
       panel.appendChild(grid);
 
-      panel.appendChild(el('div', 'lbl', '일지 (' + saved.length + ')'));
-      const br = el('div', 'row wrap-row');
-      br.append(
-        btn('내보내기', '', () => copyText(JSON.stringify(saved)).then(() => toast('클립보드에 복사했습니다'))),
-        btn('가져오기', '', importList)
-      );
-      panel.appendChild(br);
+      panel.appendChild(el('div', 'lbl', '차단'));
+      const kr = el('div', 'row');
+      kr.appendChild(btn('차단 목록 (' + (blocks.artists.length + blocks.works.length) + ')', '', () => setPanel('block')));
+      panel.appendChild(kr);
 
-      const fab = el('div', 'fabwrap');
+      // 일지 내보내기 · 가져오기와 ? 를 한 줄에
+      panel.appendChild(el('div', 'lbl', '일지 (' + saved.length + ')'));
+      const br = el('div', 'row');
       const hb = el('button', 'helpfab', '?');
       hb.type = 'button';
       hb.title = '기능 설명';
       hb.setAttribute('aria-label', '기능 설명');
+      hb.style.marginLeft = 'auto';
       hb.addEventListener('click', () => setPanel('help'));
-      fab.appendChild(hb);
-      panel.appendChild(fab);
+      br.append(
+        btn('내보내기', '', () => copyText(JSON.stringify(saved)).then(() => toast('클립보드에 복사했습니다'))),
+        btn('가져오기', '', importList),
+        hb
+      );
+      panel.appendChild(br);
     }
 
     // ----- 새로고침이 필요한 설정 확인 팝업 -----
@@ -3873,49 +3938,82 @@
       popOpen(a, null);
     }
 
+    let helpTab = 'list';
+    const HI = {
+      tap: SV('<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" opacity=".45"/>'),
+      hold: SV('<circle cx="12" cy="12" r="3.5"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>'),
+      swipe: SV('<path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/>'),
+      pinch: SV('<path d="M4 4l6 6M20 20l-6-6M4 4v5M4 4h5M20 20v-5M20 20h-5"/>'),
+      star: SV('<path d="' + STAR_D + '"/>'),
+      block: SV('<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>'),
+      grid: SV('<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'),
+      undo: SV('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),
+      frame: SV('<rect x="5" y="3" width="14" height="18" rx="3"/>'),
+      down: SV('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'),
+      globe: SV('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
+      inf: SV('<path d="M7 9a3 3 0 1 0 0 6c3 0 7-6 10-6a3 3 0 1 1 0 6c-3 0-7-6-10-6z"/>'),
+      H: '<b>H</b>'
+    };
+    const HELP = {
+      list: [
+        [HI.tap, '이미지 누르기', '작품이 커지면서 1페이지로 열려요.'],
+        [ICON.info, '제목 누르기', '태그와 작가를 바로 보여 줘요.'],
+        [HI.block, '꾹 누르기', '이 작품이나 작가를 차단해요.'],
+        [HI.frame, '테두리 색', '흰색은 1페이지 준비 끝, 파란색은 이미 본 작품이에요.'],
+        [HI.grid, '×N 뱃지', '제목이 같은 작품 묶음이에요. 눌러서 펼쳐요.'],
+        [ICON.sort, '정렬', '왼쪽 아래 버튼으로 최신 · 인기 순을 바꿔요.']
+      ],
+      reader: [
+        [HI.tap, '탭', '왼쪽은 다음, 오른쪽은 이전 페이지예요. 키보드 ← → 도 돼요.'],
+        [HI.swipe, '끌기', '손가락을 따라오고, 조금만 밀어도 넘어가요.'],
+        [HI.pinch, '두 손가락', '확대하고 이동해요. ↺ 버튼을 누르면 원래 크기로 돌아와요.'],
+        [HI.grid, '1 / N', '미리 받은 페이지를 보고 바로 그 페이지로 가요.'],
+        [HI.star, '별 5개', '별점을 누르고 별명을 정하면 일지에 남아요.'],
+        [HI.H, 'H', '히토미 홈이나 작품을 열기 직전 화면으로 돌아가요.']
+      ],
+      journal: [
+        [ICON.hist, '기록 · 일지', '본 작품은 기록에, 별점 매긴 작품은 일지에 모여요.'],
+        [HI.hold, '카드 꾹 누르기', '품번 복사 · 수정 · 삭제 메뉴가 떠요.'],
+        [ICON.sort, '정렬', '작성일순 · 별점순. 별점순에서는 구분선을 눌러 접어요.'],
+        [HI.undo, '되돌리기', '지운 건 아래 알림의 되돌리기로 살려요.']
+      ],
+      set: [
+        [HI.down, 'Pre Load', '다음 페이지와 목록의 1페이지를 미리 받아 둬요.'],
+        [HI.globe, 'Only Korean', '한국어 작품만 보여요. 바꾸면 새로고침해서 적용해요.'],
+        [HI.inf, 'Unlimited scroll', '목록을 끝없이 이어 붙여요.'],
+        [HI.block, 'Block', '차단한 작품 · 작가를 숨겨요. 차단 목록에서 풀 수 있어요.'],
+        [ICON.copy, '내보내기 · 가져오기', '일지를 복사해 두거나 다시 불러와요.']
+      ]
+    };
+
+    function paintHelp(box) {
+      box.textContent = '';
+      (HELP[helpTab] || []).forEach(([ic, t, d]) => {
+        const c = el('div', 'hcard');
+        const i = el('div', 'hic');
+        i.innerHTML = ic;
+        const tx = el('div', 'htx');
+        tx.append(el('div', 'hct', t), el('div', 'hcd', d));
+        c.append(i, tx);
+        box.appendChild(c);
+      });
+    }
+
     function renderHelp() {
       panel.textContent = '';
-      panel.appendChild(btn('← 설정', '', () => setPanel('set')));
-      const sections = [
-        ['목록', [
-          ['카드 누르기', '작품이 커지면서 1페이지로 바뀌어 열립니다. 1페이지가 미리 받아진 카드에는 흰 테두리가 생깁니다.'],
-          ['파란 테두리와 그라데이션', '이미 본 작품입니다.'],
-          ['제목 아래 날짜', '작품의 게시일자를 작고 흐리게 보여줍니다.'],
-          ['제목 누르기', '작품의 태그와 작가를 팝업으로 보여줍니다. 작품을 열려면 이미지를 누릅니다.'],
-          ['×N 뱃지', '제목이 같은 작품이 여러 개 묶여 있다는 뜻입니다. 누르면 목록이 펼쳐집니다.'],
-          ['정렬 필터', '목록 정렬 방식을 바꿉니다.'],
-          ['하단 알약', '품번 복사, 별점, 검색, 최근·일지 목록, 설정을 엽니다.'],
-          ['별 5개', '작품 화면 하단 알약의 별을 누르면 별점이 매겨지고, 위로 뜨는 창에서 별명을 정해 저장하면 일지에 남습니다.'],
-          ['기록·일지 카드 꾹 누르기', '카드 아래에 복사 · 수정 · 삭제 메뉴가 뜹니다. 지운 것은 되돌리기로 살릴 수 있습니다.'],
-          ['일지 목록', '아래쪽 막대에서 작성일순·별점순으로 정렬합니다. 별점순일 때는 별점마다 구분선이 들어가고, 구분선을 누르면 그 별점의 일지를 접거나 펼칩니다. 지운 일지는 되돌리기로 살릴 수 있습니다.']
-        ]],
-        ['리더', [
-          ['왼쪽 탭 · ←', '다음 페이지로 넘어갑니다.'],
-          ['오른쪽 탭 · →', '이전 페이지로 넘어갑니다.'],
-          ['드래그', '손가락을 따라 페이지가 움직입니다. 오른쪽으로 끌면 다음, 왼쪽으로 끌면 이전입니다. 화면 폭의 12% 이상 끌거나 가볍게 밀면 넘어갑니다.'],
-          ['두 손가락', '벌려서 확대하고 모아서 줄입니다. 확대한 채로 두 손가락을 움직이면 이동도 함께 됩니다.'],
-          ['확대 상태', '한 손가락으로 끌면 이동합니다. 확대 중에는 탭으로 넘어가지 않습니다.'],
-          ['복구 버튼', '누르면 가운데 정렬된 1배로 돌아옵니다. 1배보다 작게 줄인 뒤 손을 떼도 1배로 돌아옵니다.'],
-          ['Ctrl + 휠', '확대와 축소를 합니다.'],
-          ['0 / N', '누르면 페이지 미리보기가 열립니다.'],
-          ['H', '누르면 히토미 홈으로 갈지, 작품을 누르기 직전 화면으로 갈지 고를 수 있습니다.']
-        ]],
-        ['설정', [
-          ['Pre Load', '다음 페이지를 미리 받습니다. 목록에서는 화면에 보이는 작품의 1페이지를 미리 받습니다.'],
-          ['Only Korean', '한국어 작품만 보여줍니다. 바꾸면 위에 뜨는 팝업에서 새로고침해 적용합니다.'],
-          ['Unlimited scroll', '목록을 끝없이 이어 붙입니다. 바꾸면 위에 뜨는 팝업에서 새로고침해 적용합니다.'],
-          ['일지 내보내기·가져오기', '일지를 JSON으로 복사하거나 붙여넣습니다.']
-        ]]
-      ];
-      sections.forEach(([title, items]) => {
-        panel.appendChild(el('div', 'lbl', title));
-        const box = el('div', 'hlp');
-        items.forEach(([k, d]) => {
-          box.appendChild(el('div', 'hlk', k));
-          box.appendChild(el('div', 'hld', d));
-        });
-        panel.appendChild(box);
-      });
+      const top = el('div', 'hhd');
+      const back = el('button', 'btn hback', '←');
+      back.type = 'button';
+      back.title = '설정으로';
+      back.addEventListener('click', () => setPanel('set'));
+      const box = el('div', 'hcards');
+      const seg = segCtl([['list', '목록'], ['reader', '리더'], ['journal', '일지'], ['set', '설정']], helpTab, k => {
+        helpTab = k;
+        growRender(() => paintHelp(box));
+      }, 'sm hseg');
+      top.append(back, seg);
+      panel.append(top, box);
+      paintHelp(box);
     }
 
     let pvTimer = 0, pvSig = '';
@@ -4072,7 +4170,7 @@
 
     const btnFor = {
       search: '#searchBtn', hist: '#histBtn', set: '#setBtn',
-      info: '#infoBtn', sort: '#filt', bm: '#pstars', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn'
+      info: '#infoBtn', sort: '#filt', bm: '#pstars', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn', block: '#setBtn'
     };
     // ⋯ 상세정보: 팝업을 작품 카드 안에 붙여서, 스크롤해도 카드와 한 몸처럼 움직이게 한다
     let metaCard = null, meta = null;
@@ -4109,8 +4207,9 @@
     }
     window.addEventListener('resize', () => { if (meta) placeMeta(meta); });
 
-    openCardMeta = (o, hostEl) => {
-      if (meta && metaCard && metaCard.id === o.id) { closeMeta(); return; }
+    openCardMeta = (o, hostEl, kind) => {
+      kind = kind || 'meta';
+      if (meta && metaCard && metaCard.id === o.id && meta.kind === kind) { closeMeta(); return; }
       // 다른 카드의 ⋯ 를 누르면 기존 팝업은 바로 치우고 새 팝업을 띄운다
       if (meta) closeMeta(true);
       if (panelMode) setPanel(null, true);
@@ -4132,8 +4231,9 @@
       s.appendChild(mroot);
       card.classList.add('hk-metaon');
       card.appendChild(h);
-      meta = { host: h, pop, card };
-      renderMeta(pop);
+      meta = { host: h, pop, card, kind };
+      if (kind === 'block') renderBlockPop(pop, o);
+      else renderMeta(pop);
       pop.classList.add('open');
       placeMeta(meta);
       popOpen(pop, null);
@@ -4150,6 +4250,93 @@
       e.stopImmediatePropagation();
       closeMeta();
     }, true);
+
+    // 꾹 누르기 팝업: 이 작품 · 작가 · 그룹 차단
+    function renderBlockPop(box, o) {
+      box.textContent = '';
+      box.scrollTop = 0;
+      const m = o.meta || { artists: [], groups: [] };
+      box.appendChild(el('div', 'ttl', settings.koreanTitle ? koreanTitle(o.title || '') : (o.title || '')));
+      box.appendChild(el('div', 'lbl', '차단'));
+      const list = el('div', 'bkl');
+      const mk = (label, sub, fn) => {
+        const b = el('button', 'bkb');
+        b.type = 'button';
+        b.append(el('span', 'bkt', label), el('span', 'bks', sub || ''));
+        b.addEventListener('click', e => { e.stopPropagation(); fn(); });
+        list.appendChild(b);
+      };
+      mk('이 작품 차단', 'No. ' + o.id, () => blockThing({ type: 'work', id: o.id, title: o.title }));
+      (m.artists || []).forEach(a => mk('작가 차단', a, () => blockThing({ type: 'artist', name: a })));
+      (m.groups || []).forEach(g => mk('그룹 차단', g, () => blockThing({ type: 'artist', name: g })));
+      box.appendChild(list);
+      if (settings.blockOn === false) box.appendChild(el('div', 'hint', '지금은 설정의 Block 이 꺼져 있어서 차단해도 숨겨지지 않아요.'));
+    }
+
+    function hideBlockedAnimated() {
+      const cards = Array.from(document.querySelectorAll('.gallery-content > div[data-hk-done]:not(.hk-blocked)')).filter(isBlockedCard);
+      const done = () => { applyBlocks(); mergeDuplicates(); };
+      if (!cards.length) { done(); return; }
+      cards.forEach(c => c.animate && c.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.85)' }],
+        { duration: 240, easing: 'ease-in', fill: 'forwards' }));
+      setTimeout(() => {
+        cards.forEach(c => c.getAnimations && c.getAnimations().forEach(a => a.cancel()));
+        done();
+      }, 240);
+    }
+
+    function blockThing(x) {
+      closeMeta();
+      let undo;
+      if (x.type === 'work') {
+        if (!blocks.works.some(w => w.id === x.id)) blocks.works.push({ id: x.id, title: x.title || '' });
+        undo = () => { blocks.works = blocks.works.filter(w => w.id !== x.id); };
+      } else {
+        const n = normArtName(x.name);
+        if (blocks.artists.indexOf(n) < 0) blocks.artists.push(n);
+        undo = () => { blocks.artists = blocks.artists.filter(a => a !== n); };
+      }
+      saveBlocks();
+      hideBlockedAnimated();
+      toast(x.type === 'work' ? '작품을 차단했습니다' : x.name + ' 차단', { label: '되돌리기', fn: () => {
+        undo();
+        saveBlocks();
+        applyBlocks();
+        mergeDuplicates();
+      } });
+    }
+
+    // 설정 > 차단 목록
+    function renderBlockList() {
+      panel.textContent = '';
+      panel.appendChild(btn('← 설정', '', () => setPanel('set')));
+      const unblock = fn => { fn(); saveBlocks(); applyBlocks(); mergeDuplicates(); growRender(renderBlockList); };
+
+      panel.appendChild(el('div', 'lbl', '작가 · 그룹 (' + blocks.artists.length + ')'));
+      const c = el('div', 'chips');
+      if (!blocks.artists.length) c.appendChild(el('div', 'hint', '차단한 작가가 없습니다'));
+      blocks.artists.forEach(a => {
+        const ch = el('span', 'chip bad', a + '  ✕');
+        ch.title = '눌러서 차단 풀기';
+        ch.addEventListener('click', () => unblock(() => { blocks.artists = blocks.artists.filter(x => x !== a); }));
+        c.appendChild(ch);
+      });
+      panel.appendChild(c);
+
+      panel.appendChild(el('div', 'lbl', '작품 (' + blocks.works.length + ')'));
+      const wl = el('div', 'slist');
+      if (!blocks.works.length) wl.appendChild(el('div', 'hint', '차단한 작품이 없습니다'));
+      blocks.works.forEach(w => {
+        const r = el('button', 'srow bwr');
+        r.type = 'button';
+        r.title = '눌러서 차단 풀기';
+        r.append(el('span', 'bwid', w.id), el('span', 'bwt', w.title || ''), el('span', 'bwx', '✕'));
+        r.addEventListener('click', () => unblock(() => { blocks.works = blocks.works.filter(x => x.id !== w.id); }));
+        wl.appendChild(r);
+      });
+      panel.appendChild(wl);
+      panel.appendChild(el('div', 'hint', '항목을 누르면 차단이 풀려요. 홈에서 작품을 꾹 누르면 차단할 수 있어요.'));
+    }
 
     function renderMeta(box) {
       box.textContent = '';
@@ -4189,7 +4376,7 @@
     const RENDERERS = {
       search: renderSearch, hist: renderHist, set: renderSettings,
       info: renderInfo, sort: renderSort, bm: renderBm,
-      preview: renderPreview, home: renderHomeChoice, confirm: renderConfirm, help: renderHelp
+      preview: renderPreview, home: renderHomeChoice, confirm: renderConfirm, help: renderHelp, block: renderBlockList
     };
 
     function setPanel(mode, closeOnly) {
@@ -4586,6 +4773,41 @@
       try { sessionStorage.removeItem('hk_zoom'); sessionStorage.removeItem('hk_blk'); } catch (e) {}
     }, 4500);
   }
+
+  // 홈 카드 꾹 누르기 → 카드 아래에 차단 팝업
+  const homeLp = { t: 0, x: 0, y: 0, just: false };
+  const cardHostIn = path => path.find(n => n && n.classList && n.classList.contains('hk-card-host'));
+  document.addEventListener('pointerdown', e => {
+    homeLp.just = false;
+    clearTimeout(homeLp.t);
+    homeLp.t = 0;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const hostEl = cardHostIn(e.composedPath());
+    if (!hostEl || !hostEl._hkInfo) return;
+    homeLp.x = e.clientX;
+    homeLp.y = e.clientY;
+    homeLp.t = setTimeout(() => {
+      homeLp.t = 0;
+      homeLp.just = true;
+      try { if (navigator.vibrate) navigator.vibrate(10); } catch (err) {}
+      if (openCardMeta) openCardMeta(hostEl._hkInfo, hostEl, 'block');
+    }, 450);
+  }, true);
+  document.addEventListener('pointermove', e => {
+    if (!homeLp.t) return;
+    if (Math.abs(e.clientX - homeLp.x) > 8 || Math.abs(e.clientY - homeLp.y) > 8) { clearTimeout(homeLp.t); homeLp.t = 0; }
+  }, true);
+  ['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, () => { clearTimeout(homeLp.t); homeLp.t = 0; }, true));
+  document.addEventListener('contextmenu', e => {
+    if (cardHostIn(e.composedPath())) e.preventDefault();
+  }, true);
+  // 꾹 누른 뒤 손을 뗄 때 생기는 클릭으로 작품이 열리지 않게 한다
+  document.addEventListener('click', e => {
+    if (!homeLp.just) return;
+    homeLp.just = false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
 
   document.addEventListener('click', e => {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -5518,6 +5740,7 @@
     rewriteLinks(document);
     filterGalleries(document);
     if (settings.cardStyle) restyleCards(document);
+    applyBlocks();
     if (settings.mergeTitles) mergeDuplicates();
     initInfinite();
     warmPages();
