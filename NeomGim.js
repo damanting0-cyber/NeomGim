@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.7.0
+// @version      1.9.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.7.0';
+  const VERSION = '1.9.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -405,7 +405,7 @@
     .grplist .d { color: rgba(255, 255, 255, 0.6); font-size: 10.5px; }
     .info {
       position: absolute; left: 0; right: 0; bottom: 0;
-      padding: 10px 34px 11px 12px; cursor: pointer;
+      padding: 10px 12px 11px 12px; cursor: pointer;
       border-radius: 0 0 17px 17px;
       background: #d9dce3;
       transition: padding .3s ease;
@@ -419,8 +419,13 @@
       letter-spacing: .5px; transition: background .2s ease, transform .2s ease;
     }
     .dots:active { transform: scale(.9); }
+    .info .title a { cursor: pointer; }
+    .title a.cut {
+      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent 100%);
+      mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent 100%);
+    }
     .title a {
-      display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      display: block; white-space: nowrap; overflow: hidden; text-overflow: clip;
       color: #000; text-decoration: none;
       font-size: 13px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em;
       transition: color .25s ease;
@@ -433,7 +438,7 @@
     }
     @keyframes seenIn { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
     @media (min-width: 521px) {
-      .info { padding: 10px 34px 12px 14px; }
+      .info { padding: 10px 14px 12px 14px; }
       .title a { font-size: 14.5px; }
     }
   `;
@@ -447,7 +452,6 @@
         <div class="title"><a></a></div>
         <div class="dline"></div>
       </div>
-      <button class="dots" type="button" title="태그 · 작가 보기">⋯</button>
     </div>`;
   let cardSheet = null;
   try {
@@ -472,6 +476,8 @@
       background: rgba(26, 26, 30, 0.84);
       border: 1px solid rgba(255, 255, 255, 0.22);
       box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+      -webkit-backdrop-filter: blur(20px) saturate(1.5);
+      backdrop-filter: blur(20px) saturate(1.5);
     }
 
     @keyframes hkBarIn {
@@ -626,6 +632,7 @@
     }
     .root.leave .wrap { opacity: 0; transform: translateY(10px); transition: opacity .28s ease, transform .28s ease; }
     .root.enter .wrap { animation: hkWrapIn .5s var(--ease) .12s backwards; }
+    .root.morph .bar, .root.morph .filt, .root.morph .tl { animation: none; }
     @keyframes hkWrapIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
     .glass {
       position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 1;
@@ -838,22 +845,31 @@
       .bstar svg { width: 16px; height: 16px; }
     }
 
-    .panel.hist > .hbody.jpad { padding-bottom: 104px; }
+    .panel.hist > .hbody.jpad { padding-bottom: 66px; }
     .jfoot {
       position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3;
       display: flex; flex-direction: column; gap: 6px; padding: 6px;
-      border-radius: 22px; background: rgba(34, 34, 40, 0.95);
+      border-radius: 22px; background: rgba(34, 34, 40, 0.72);
       border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+      -webkit-backdrop-filter: blur(18px) saturate(1.5);
+      backdrop-filter: blur(18px) saturate(1.5);
     }
     .jfr { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .jfr .jn { color: var(--sub); font-size: 11.5px; font-weight: 600; padding-left: 8px; white-space: nowrap; }
-    .seg.sf { width: 100%; }
-    .seg.sf .segb { flex: 1 1 0; min-width: 0; padding: 0 2px; }
     .sdiv {
-      grid-column: 1 / -1; display: flex; align-items: center; gap: 8px;
-      margin: 8px 2px 0; color: #ffd54a; font-size: 12px; font-weight: 700;
+      grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; cursor: pointer;
+      margin: 4px 0 0; padding: 6px 6px 6px 4px; border-radius: 12px;
+      color: #ffd54a; font-size: 12px; font-weight: 700; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: background .2s ease, transform .3s cubic-bezier(.22, 1, .36, 1);
     }
+    .sdiv:active { background: rgba(255, 255, 255, 0.08); transform: scale(.98); transition-duration: .1s; }
+    .sdiv .sdc { order: 3; display: inline-flex; color: var(--sub); transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
+    .sdiv .sdc svg { width: 15px; height: 15px; display: block; }
+    .sdiv.fold .sdc { transform: rotate(-90deg); }
+    .sdiv.fold { color: rgba(255, 213, 74, 0.7); }
     .sdiv:first-child { margin-top: 0; }
+    .item.jhide { display: none !important; }
     .sdiv::after { content: ''; order: 1; flex: 1 1 auto; height: 1px; background: rgba(255, 255, 255, 0.18); }
     .sdiv .sdn { order: 2; color: var(--sub); font-size: 11px; font-weight: 600; }
     .sdiv .sdl.none { color: var(--sub); }
@@ -876,6 +892,8 @@
     .ibs svg { width: 16px; height: 16px; display: block; fill: none; }
     .ibs .ibl { font-size: 12px; font-weight: 600; margin-left: 5px; }
     .ibs:active { transform: scale(.86); transition-duration: .1s; }
+    .ibs.ebtn { flex: none; align-self: flex-end; width: 26px; height: 26px; margin: 0 2px 1px 4px; padding: 0; }
+    .ibs.ebtn svg { width: 13px; height: 13px; }
     .item {
       display: flex; flex-direction: column; gap: 6px; min-width: 0;
       padding: 6px; border-radius: 16px; background: rgba(255, 255, 255, 0.08);
@@ -1017,12 +1035,14 @@
     html.hk-zanim .hk-pg { transition: transform .3s cubic-bezier(.22, 1, .36, 1); }
     .hk-zoom {
       position: fixed; z-index: 2147483646; pointer-events: none; overflow: hidden;
-      background-color: #000;
+      background-color: #3a3a40;
       box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
       transition: opacity .25s ease, top .46s cubic-bezier(.5, 0, .15, 1), left .46s cubic-bezier(.5, 0, .15, 1),
         width .46s cubic-bezier(.5, 0, .15, 1), height .46s cubic-bezier(.5, 0, .15, 1),
-        border-radius .46s cubic-bezier(.5, 0, .15, 1), box-shadow .46s ease;
+        border-radius .46s cubic-bezier(.5, 0, .15, 1), box-shadow .46s ease, background-color .4s ease;
     }
+    .hk-zoom.pg-on { background-color: #111111; }
+    .hk-zoom img.hk-z-thumb.gone { opacity: 0; transition: opacity .38s ease; }
     @media (prefers-reduced-motion: reduce) {
       #hk-fx-ov, .hk-zoom { transition-duration: .01ms !important; }
     }
@@ -1255,7 +1275,7 @@
   }
 
   function goSite() {
-    location.href = KOREAN_LINK;
+    leaveTo(KOREAN_LINK);
   }
 
   function goBackToList() {
@@ -1264,7 +1284,7 @@
       from = sessionStorage.getItem('hk_from');
       sessionStorage.setItem('hk_home', '1');
     } catch (e) {}
-    if (from) location.href = from;
+    if (from) leaveTo(from);
     else goSite();
   }
 
@@ -1502,6 +1522,33 @@
 
   let openCardMeta = null;
 
+  // 제목이 칸보다 길어 잘릴 때만 오른쪽 끝을 흐리게 만든다
+  const cutQ = new Set();
+  let cutRaf = 0;
+  function markCut(a) {
+    if (!a || !a.isConnected) return;
+    a.classList.toggle('cut', a.scrollWidth > a.clientWidth + 1);
+  }
+  function queueCut(a) {
+    cutQ.add(a);
+    if (cutRaf) return;
+    cutRaf = requestAnimationFrame(() => {
+      cutRaf = 0;
+      const list = Array.from(cutQ);
+      cutQ.clear();
+      list.forEach(markCut);
+    });
+  }
+  function recheckCuts() {
+    document.querySelectorAll('.hk-card-host').forEach(h => {
+      const a = h.shadowRoot && h.shadowRoot.querySelector('.title a');
+      if (a) queueCut(a);
+    });
+  }
+  let cutResizeT = 0;
+  window.addEventListener('resize', () => { clearTimeout(cutResizeT); cutResizeT = setTimeout(recheckCuts, 150); });
+  try { document.fonts && document.fonts.ready.then(recheckCuts); } catch (e) {}
+
   function buildCardHost(media, readerUrl, title, id, seenIds, meta) {
     const cardHost = document.createElement('div');
     cardHost.className = 'hk-card-host';
@@ -1524,13 +1571,6 @@
     cardHost.dataset.hkId = id;
     if (pgReady.has(String(id))) sh.querySelector('.card').classList.add('ready');
     sh.querySelector('.card').classList.toggle('viewed', seenIds.has(id));
-
-    const dots = sh.querySelector('.dots');
-    dots.addEventListener('click', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (openCardMeta) openCardMeta({ id, title, meta: meta || { artists: [], groups: [], tags: [] } }, cardHost);
-    });
 
     const grp = sh.querySelector('.grp'), grpList = sh.querySelector('.grplist');
     grp.addEventListener('click', e => {
@@ -1557,10 +1597,13 @@
     });
 
     sh.addEventListener('click', saveScroll, true);
+    // 제목 줄(제목·날짜)을 누르면 작품으로 가지 않고 ⋯ 와 같은 상세 팝업을 연다
     sh.querySelector('.info').addEventListener('click', e => {
-      if (e.target.closest('a')) return;
-      location.href = readerUrl;
+      e.preventDefault();
+      e.stopPropagation();
+      if (openCardMeta) openCardMeta({ id, title, meta: meta || { artists: [], groups: [], tags: [] } }, cardHost);
     });
+    queueCut(titleA);
 
     return { cardHost, sh };
   }
@@ -2504,6 +2547,16 @@
     const curId = getCurrentId();
     const curSort = currentSort();
 
+    // 하단 버튼 조각들 (처음 그릴 때와, 이동 중에 다음 화면 모양으로 바꿀 때 같은 모양을 쓴다)
+    const curHtml = id => `<button class="cur" type="button" id="curNum" title="품번 복사">${id}</button>` +
+      `<div class="pstars" id="pstars" title="별점을 누르면 일지에 남깁니다">${[1, 2, 3, 4, 5].map(i => `<button class="bstar" type="button" data-n="${i}" title="${i}점" aria-label="${i}점">${starSvg(false)}</button>`).join('')}</div>`;
+    const tlInner = (reader, work) =>
+      (reader ? `<div class="pg" id="pg" title="페이지 이동">- / -</div>` : '') +
+      (reader ? `<button class="ib" type="button" id="zoomBtn" title="원래 크기로">${ICON.reset}</button>` : '') +
+      (work ? `<button class="ib" type="button" id="infoBtn" title="작품 세부사항 (작가·품번·태그·등록일)">${ICON.info}</button>` : '');
+    const filtHtml = sort => `<button class="filt pill" type="button" id="filt" title="정렬 바꾸기">` +
+      `${ICON.sort}<span class="fl">${SORT_KR[sort] || ''}</span></button>`;
+
     sh.innerHTML = `
       <style>${PANEL_CSS}</style>
       <div class="root" id="root">
@@ -2515,20 +2568,11 @@
             <div class="toast pill" id="toast"></div>
             <div class="panel pill" id="panel"></div>
           </div>
-          <div class="tl pill" id="tl">
-            ${IS_READER ? `<div class="pg" id="pg" title="페이지 이동">- / -</div>` : ''}
-            ${IS_READER ? `<button class="ib" type="button" id="zoomBtn" title="원래 크기로">${ICON.reset}</button>` : ''}
-            ${IS_WORK_PAGE ? `<button class="ib" type="button" id="infoBtn" title="작품 세부사항 (작가·품번·태그·등록일)">${ICON.info}</button>` : ''}
-          </div>
+          <div class="tl pill" id="tl">${tlInner(IS_READER, IS_WORK_PAGE)}</div>
           <div class="bottom">
-            ${curSort ? `
-            <button class="filt pill" type="button" id="filt" title="정렬 바꾸기">
-              ${ICON.sort}<span class="fl">${SORT_KR[curSort] || ''}</span>
-            </button>` : ''}
+            ${curSort ? filtHtml(curSort) : ''}
             <div class="bar pill" id="bar">
-              ${curId ? `
-              <button class="cur" type="button" id="curNum" title="품번 복사">${curId}</button>
-              <div class="pstars" id="pstars" title="별점을 누르면 일지에 남깁니다">${[1, 2, 3, 4, 5].map(i => `<button class="bstar" type="button" data-n="${i}" title="${i}점" aria-label="${i}점">${starSvg(false)}</button>`).join('')}</div>` : ''}
+              ${curId ? curHtml(curId) : ''}
               <button class="ib" type="button" id="searchBtn" title="검색">${ICON.search}</button>
               <button class="ib" type="button" id="histBtn" title="최근 / 일지">${ICON.hist}</button>
               <button class="ib gear" type="button" id="setBtn" title="설정">${ICON.gear}</button>
@@ -2542,12 +2586,147 @@
     const $ = sel => sh.querySelector(sel);
     const root = $('#root');
     { const t = $('#tl'); if (t && !t.querySelector('button, .pg')) t.remove(); }
+    let barFrom = null;
     try {
-      if (sessionStorage.getItem('hk_enter')) {
-        sessionStorage.removeItem('hk_enter');
-        root.classList.add('enter');
-      }
+      const v = JSON.parse(sessionStorage.getItem('hk_bar') || 'null');
+      sessionStorage.removeItem('hk_bar');
+      if (v && Date.now() - v.t < 5000) barFrom = v;
     } catch (e) {}
+    if (barFrom) {
+      root.classList.add('morph');
+      // 앞 화면에서 이미 이 모양으로 바꿔 두었으면 여기서는 아무 애니메이션도 하지 않는다
+      if (!barFrom.done) requestAnimationFrame(() => morphBarFrom(barFrom));
+    }
+
+    // ----- 이동하기 직전에, 지금 버튼들을 다음 화면의 모양으로 바꾼다 -----
+    const GROW = 'cubic-bezier(.22, 1, .36, 1)';
+    const ZERO_BOX = { width: '0px', paddingLeft: '0px', paddingRight: '0px', marginLeft: '0px', marginRight: '0px' };
+    function boxOf(e) {
+      const cs = getComputedStyle(e);
+      return { width: e.offsetWidth + 'px', paddingLeft: cs.paddingLeft, paddingRight: cs.paddingRight,
+        marginLeft: cs.marginLeft, marginRight: cs.marginRight };
+    }
+    function expandIn(e, dur) {
+      if (!e.animate) return;
+      const full = boxOf(e);
+      e.style.overflow = 'hidden';
+      const a = e.animate([Object.assign({ opacity: 0 }, ZERO_BOX), Object.assign({ opacity: 1 }, full)],
+        { duration: dur, easing: GROW });
+      a.onfinish = a.oncancel = () => { e.style.overflow = ''; };
+    }
+    function collapseOut(e, dur) {
+      if (!e.animate) { e.remove(); return; }
+      const full = boxOf(e);
+      e.style.overflow = 'hidden';
+      e.style.flexShrink = '0';
+      const a = e.animate([Object.assign({ opacity: 1 }, full), Object.assign({ opacity: 0 }, ZERO_BOX)],
+        { duration: dur, easing: GROW, fill: 'forwards' });
+      a.onfinish = () => e.remove();
+    }
+    function popPill(e, show, dur) {
+      if (!e.animate) { if (!show) e.remove(); return; }
+      const kf = [{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'none' }];
+      const a = e.animate(show ? kf : kf.slice().reverse(), { duration: dur, easing: GROW, fill: show ? 'none' : 'forwards' });
+      if (!show) a.onfinish = () => e.remove();
+    }
+    function targetSpec(url) {
+      let u;
+      try { u = new URL(url, location.href); } catch (e) { return null; }
+      if (u.origin !== location.origin) return null;
+      const path = u.pathname;
+      const work = LIST_PAGE_RE.test(path);
+      const reader = /^\/reader\//.test(path);
+      const m = path.match(/[-/](\d+)\.html$/);
+      let sort = null;
+      const pm = path.match(/^\/popular\/(today|week|month|year)-/);
+      if (pm) sort = pm[1];
+      else if (path === '/' || /^\/index-/.test(path)) sort = 'date';
+      return { id: m ? m[1] : null, work, reader, sort };
+    }
+    function frag(html) {
+      const t = document.createElement('template');
+      t.innerHTML = html;
+      return Array.from(t.content.children);
+    }
+    window.__hkMorphTo = (url, dur) => {
+      const t = targetSpec(url);
+      if (!t) return false;
+      const D = dur || 420;
+      root.classList.add('morph');
+      if (panelMode) setPanel(null, true);
+      if (metaOpen()) closeMeta(true);
+      const bar = $('#bar');
+      const bottom = sh.querySelector('.bottom');
+      // 품번 · 별
+      const cn = $('#curNum'), ps = $('#pstars');
+      if (t.id) {
+        if (cn) cn.textContent = t.id;
+        else if (bar) {
+          const nodes = frag(curHtml(t.id));
+          nodes.slice().reverse().forEach(n => bar.insertBefore(n, bar.firstChild));
+          nodes.forEach(n => expandIn(n, D));
+        }
+      } else {
+        [cn, ps].forEach(n => { if (n) collapseOut(n, D); });
+      }
+      // 정렬 버튼
+      const ft = $('#filt');
+      if (t.sort) {
+        if (ft) { const fl = ft.querySelector('.fl'); if (fl) fl.textContent = SORT_KR[t.sort] || ''; }
+        else if (bottom && bar) {
+          const n = frag(filtHtml(t.sort))[0];
+          bottom.insertBefore(n, bar);
+          expandIn(n, D);
+        }
+      } else if (ft) collapseOut(ft, D);
+      // 위쪽 작은 알약 (페이지 번호 · 확대 복구 · 세부사항)
+      const inner = tlInner(t.reader, t.work);
+      const tl = $('#tl');
+      if (inner && !tl) {
+        const n = frag(`<div class="tl pill" id="tl">${inner}</div>`)[0];
+        $('#wrap').insertBefore(n, bottom);
+        n.style.transformOrigin = '100% 100%';
+        popPill(n, true, D);
+      } else if (!inner && tl) {
+        tl.style.transformOrigin = '100% 100%';
+        popPill(tl, false, D);
+      } else if (inner && tl && tl.innerHTML !== inner) {
+        const h0 = tl.offsetWidth;
+        tl.innerHTML = inner;
+        const h1 = tl.offsetWidth;
+        if (tl.animate && h0 !== h1) tl.animate([{ width: h0 + 'px' }, { width: h1 + 'px' }], { duration: D, easing: GROW });
+      }
+      return true;
+    };
+
+    // 앞 화면의 알약 폭에서 지금 폭으로 늘어나거나 줄어들고, 새로 생긴 버튼만 커지며 나타난다
+    function morphBarFrom(v) {
+      const EASE = 'cubic-bezier(.22, 1, .36, 1)';
+      const had = new Set(v.ids || []);
+      const bar = $('#bar');
+      if (bar) {
+        const w1 = bar.offsetWidth;
+        Array.from(bar.children).forEach(c => {
+          if (c.id && had.has(c.id)) return;
+          if (c.animate) c.animate([{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'none' }],
+            { duration: 420, delay: 120, easing: EASE, fill: 'backwards' });
+        });
+        if (v.w && Math.abs(w1 - v.w) > 1 && bar.animate) {
+          bar.style.justifyContent = 'flex-end';
+          bar.style.overflow = 'hidden';
+          const a = bar.animate([{ width: v.w + 'px' }, { width: w1 + 'px' }], { duration: 520, easing: EASE });
+          const done = () => { bar.style.justifyContent = ''; bar.style.overflow = ''; };
+          a.onfinish = done;
+          a.oncancel = done;
+        }
+      }
+      ['#tl', '#filt'].forEach(sel => {
+        const e = $(sel);
+        if (!e || had.has(e.id) || !e.animate) return;
+        e.animate([{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'none' }],
+          { duration: 460, delay: 140, easing: EASE, fill: 'backwards' });
+      });
+    }
     const wrap = $('#wrap');
     const panel = $('#panel');
     const scrim = $('#scrim');
@@ -2557,7 +2736,6 @@
     let histMode = 'recent';
     let filterText = '';
     let histFilter = '';
-    let starFilter = 'all';
     let bmStars = null;
     let bmSetStars = null;
     let sItems = [], sIdx = -1;
@@ -3009,17 +3187,40 @@
       buildHistBody(body);
     }
 
+    // 모두 ↔ 일지: 지금 목록이 옆으로 빠지며 흐려지고, 새 목록이 반대쪽에서 미끄러져 들어온다 (팝업 높이도 함께)
+    let histSwapT = 0;
     function switchHist() {
       const body = panel.querySelector('.hbody');
       if (!body) return renderHist();
       filterText = ''; histFilter = '';
-      const out = Array.from(panel.querySelectorAll('.hhead .hrow')).concat(Array.from(body.children));
-      fadeSwap(out, () => {
+      const dir = histMode === 'saved' ? 1 : -1;
+      // 검색창 · 전체복사 줄은 움직이지 않고 그대로 두고, 목록과 아래 막대만 바뀌며 움직인다
+      const parts = () => Array.from(panel.querySelectorAll('.jfoot')).concat([body]);
+      const my = ++swapSeq;
+      clearTimeout(swapT);
+      clearTimeout(histSwapT);
+      const h0 = panel.offsetHeight;
+      panel.style.overflow = 'hidden';
+      panel.style.height = h0 + 'px';
+      parts().forEach(n => {
+        if (!n.animate) return;
+        n.getAnimations().forEach(a => a.cancel());
+        n.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${-dir * 18}px)` }],
+          { duration: 140, easing: 'ease-in', fill: 'forwards' });
+      });
+      histSwapT = setTimeout(() => {
+        if (my !== swapSeq) return;
+        parts().forEach(n => n.getAnimations && n.getAnimations().forEach(a => a.cancel()));
         body.scrollTop = 0;
         body.classList.add('at-top');
         buildHistBody(body);
-        return Array.from(panel.querySelectorAll('.hhead .hrow')).concat(Array.from(body.children));
-      });
+        growFrom(h0);
+        parts().forEach(n => {
+          if (!n.animate) return;
+          n.animate([{ opacity: 0, transform: `translateX(${dir * 18}px)` }, { opacity: 1, transform: 'none' }],
+            { duration: 320, easing: SWAP_EASE, fill: 'backwards' });
+        });
+      }, 140);
     }
 
     function copyIds(ids) {
@@ -3045,10 +3246,8 @@
         head.append(r1);
         body.append(list);
 
-        // 일지 개수 · 별점 필터 · 정렬은 팝업 아래쪽에 떠 있게 둔다
+        // 일지 개수 · 정렬은 팝업 아래쪽에 떠 있게 둔다
         const foot = el('div', 'jfoot');
-        const sf = segCtl([['all', '전체'], ['5', '★5'], ['4', '★4'], ['3', '★3'], ['2', '★2'], ['1', '★1'], ['0', '없음']],
-          starFilter, k => { starFilter = k; body.scrollTop = 0; growRender(renderItems); }, 'sm sf');
         const fr = el('div', 'jfr');
         const cnt = el('span', 'jn', '');
         cnt.id = 'jcount';
@@ -3059,7 +3258,7 @@
           growRender(renderItems);
         }, 'sm');
         fr.append(cnt, sort);
-        foot.append(sf, fr);
+        foot.append(fr);
         panel.append(foot);
         renderItems();
       } else {
@@ -3101,9 +3300,8 @@
       if (!box) return;
       box.textContent = '';
       const f = filterText;
-      const items = saved.filter(s => (!f || s.id.includes(f) ||
-        (s.alias || '').toLowerCase().includes(f) || (s.title || '').toLowerCase().includes(f)) &&
-        (starFilter === 'all' || (+s.stars || 0) === +starFilter));
+      const items = saved.filter(s => !f || s.id.includes(f) ||
+        (s.alias || '').toLowerCase().includes(f) || (s.title || '').toLowerCase().includes(f));
       const cnt = panel.querySelector('#jcount');
       if (cnt) cnt.textContent = items.length === saved.length
         ? '일지 ' + saved.length + '개'
@@ -3115,28 +3313,69 @@
         items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
       }
       if (!items.length) {
-        box.appendChild(el('div', 'empty', !saved.length ? '작성한 일지가 없습니다'
-          : (starFilter !== 'all' && !f ? '이 별점의 일지가 없습니다' : '검색 결과가 없습니다')));
+        box.appendChild(el('div', 'empty', saved.length ? '검색 결과가 없습니다' : '작성한 일지가 없습니다'));
         return;
       }
       const per = new Map();
       if (byStars) items.forEach(s => { const k = +s.stars || 0; per.set(k, (per.get(k) || 0) + 1); });
+      const folded = new Set((settings.jFold || []).map(String));
       let last = null;
       items.forEach(s => {
         const st = +s.stars || 0;
         if (byStars && st !== last) {
           last = st;
-          const d = el('div', 'sdiv');
-          d.dataset.sk = String(st);
+          const key = String(st);
+          const isFold = folded.has(key);
+          const d = el('div', 'sdiv' + (isFold ? ' fold' : ''));
+          d.dataset.sk = key;
+          d.title = isFold ? '눌러서 펼치기' : '눌러서 접기';
           const lb = el('span', 'sdl' + (st ? '' : ' none'));
           if (st) lb.appendChild(starsEl(st));
           else lb.textContent = '별점 없음';
-          d.append(lb, el('span', 'sdn', per.get(st) + '개'));
+          const chev = el('span', 'sdc');
+          chev.innerHTML = SV('<path d="M6 9l6 6 6-6"/>');
+          d.append(lb, el('span', 'sdn', per.get(st) + '개'), chev);
+          // 접기·펼치기는 해당 별점 카드만 숨기거나 보이게 한다 (다른 카드는 다시 만들지 않으므로 썸네일도 다시 불러오지 않음)
+          d.addEventListener('click', () => {
+            const cur = new Set((settings.jFold || []).map(String));
+            const nowFold = !cur.has(key);
+            if (nowFold) cur.add(key); else cur.delete(key);
+            settings.jFold = Array.from(cur);
+            saveSettings();
+            d.classList.toggle('fold', nowFold);
+            d.title = nowFold ? '눌러서 펼치기' : '눌러서 접기';
+            const rows = Array.from(box.querySelectorAll('.item[data-g="' + key + '"]'));
+            const apply = () => {
+              if (!box.isConnected) return;
+              const first = snapRects(box);
+              const h0 = panel.offsetHeight;
+              rows.forEach(r => r.classList.toggle('jhide', nowFold));
+              flipFrom(box, first, '');
+              if (!nowFold) rows.forEach(r => r.animate && r.animate(
+                [{ opacity: 0, transform: 'scale(.82)' }, { opacity: 1, transform: 'none' }],
+                { duration: 320, easing: SWAP_EASE }));
+              growFrom(h0);
+            };
+            if (nowFold && rows.length && rows[0].animate) {
+              rows.forEach(r => {
+                r.style.pointerEvents = 'none';
+                r.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.82)' }],
+                  { duration: 180, easing: 'ease-in', fill: 'forwards' });
+              });
+              setTimeout(() => {
+                rows.forEach(r => { r.getAnimations().forEach(a => a.cancel()); r.style.pointerEvents = ''; });
+                apply();
+              }, 180);
+            } else apply();
+          });
           box.appendChild(d);
         }
-
         const row = el('div', 'item');
         row.dataset.id = s.id;
+        if (byStars) {
+          row.dataset.g = String(st);
+          if (folded.has(String(st))) row.classList.add('jhide');
+        }
         const info = el('div', 'info');
         info.title = '클릭: 열기';
         const dt = el('div', 'dt');
@@ -3172,9 +3411,10 @@
         });
         fl.append(tid, del);
         tb.appendChild(fl);
-        const acts = el('div', 'acts');
-        acts.append(iconBtn(ICON.edit, '일지 수정', () => openBm(s.id, 'hist')));
-        row.append(tb, foot, acts);
+        // 수정 버튼은 작은 동그라미로, 별점·날짜 줄 오른쪽 아래에 붙인다
+        const edit = iconBtn(ICON.edit, '일지 수정', e => { e.stopPropagation(); openBm(s.id, 'hist'); }, 'ebtn');
+        foot.append(edit);
+        row.append(tb, foot);
         box.appendChild(row);
       });
     }
@@ -3184,7 +3424,7 @@
     function snapRects(box, skip) {
       const m = new Map();
       Array.from(box.children).forEach(c => {
-        if (c === skip) return;
+        if (c === skip || c.classList.contains('jhide')) return;
         const k = flipKey(c);
         if (k) m.set(k, c.getBoundingClientRect());
       });
@@ -3415,12 +3655,6 @@
       }
       panel.appendChild(r2);
       panel.appendChild(el('div', 'hint', '별명을 적으면 제목 대신 그 별명이 보입니다. 저장하면 일지에 남습니다.'));
-      if (fromPill) {
-        setTimeout(() => {
-          if (!inp.isConnected) return;
-          try { inp.focus({ preventScroll: true }); } catch (e) {}
-        }, 380);
-      }
     }
 
     function importList() {
@@ -3525,12 +3759,12 @@
           ['카드 누르기', '작품이 커지면서 1페이지로 바뀌어 열립니다. 1페이지가 미리 받아진 카드에는 흰 테두리가 생깁니다.'],
           ['파란 테두리와 그라데이션', '이미 본 작품입니다.'],
           ['제목 아래 날짜', '작품의 게시일자를 작고 흐리게 보여줍니다.'],
-          ['오른쪽 아래 ⋯', '작품의 태그와 작가를 팝업으로 보여줍니다.'],
+          ['제목 누르기', '작품의 태그와 작가를 팝업으로 보여줍니다. 작품을 열려면 이미지를 누릅니다.'],
           ['×N 뱃지', '제목이 같은 작품이 여러 개 묶여 있다는 뜻입니다. 누르면 목록이 펼쳐집니다.'],
           ['정렬 필터', '목록 정렬 방식을 바꿉니다.'],
           ['하단 알약', '품번 복사, 별점, 검색, 최근·일지 목록, 설정을 엽니다.'],
           ['별 5개', '작품 화면 하단 알약의 별을 누르면 별점이 매겨지고, 위로 뜨는 창에서 별명을 정해 저장하면 일지에 남습니다.'],
-          ['일지 목록', '아래쪽 막대에서 별점별로 골라 보거나 작성일순·별점순으로 정렬합니다. 별점순일 때는 별점마다 구분선이 들어갑니다. 지운 일지는 되돌리기로 살릴 수 있습니다.']
+          ['일지 목록', '아래쪽 막대에서 작성일순·별점순으로 정렬합니다. 별점순일 때는 별점마다 구분선이 들어가고, 구분선을 누르면 그 별점의 일지를 접거나 펼칩니다. 지운 일지는 되돌리기로 살릴 수 있습니다.']
         ]],
         ['리더', [
           ['왼쪽 탭 · ←', '다음 페이지로 넘어갑니다.'],
@@ -3579,8 +3813,16 @@
 
     let pvTimer = 0, pvSig = '';
 
+    // 지금 보고 있는 페이지는 미리 받기 목록에 없어도 화면에 떠 있는 이미지로 보여 준다
+    function pvCurSrc() {
+      if (curLayer && shown && shown.src) return shown.src;
+      const im = findReaderImg();
+      return im && im.complete && im.naturalWidth ? (im.currentSrc || im.src) : '';
+    }
+
     function pvKey() {
       return [
+        pvCurSrc(),
         fxPage(),
         fxTotal(),
         Array.from(preDone).sort((a, b) => a - b).join(','),
@@ -3603,8 +3845,9 @@
       grid.textContent = '';
       for (let i = 0; i < total; i++) {
         const idx = i;
-        const c = el('div', 'pvc' + (preDone.has(idx) ? ' ok' : '') + (idx + 1 === cur ? ' cur' : ''));
-        const u = preSmall.get(idx);
+        const isCur = idx + 1 === cur;
+        const u = preSmall.get(idx) || preBlob.get(idx) || (isCur ? pvCurSrc() : '');
+        const c = el('div', 'pvc' + (preDone.has(idx) || u ? ' ok' : '') + (isCur ? ' cur' : ''));
         if (u) {
           const im = document.createElement('img');
           im.alt = '';
@@ -3616,7 +3859,7 @@
         c.appendChild(el('span', 'pvn', String(idx + 1)));
         c.addEventListener('click', () => {
           setPanel(null, true);
-          if (idx + 1 !== fxPage()) location.hash = '#' + (idx + 1);
+          if (idx + 1 !== fxPage()) turnTo(idx + 1);
         });
         grid.appendChild(c);
       }
@@ -3766,7 +4009,8 @@
       if (!meta) return;
       const path = e.composedPath();
       if (path.includes(meta.pop)) return;
-      if (path.some(n => n && n.classList && n.classList.contains('dots'))) return;
+      if (path.some(n => n && n.classList && (n.classList.contains('dots') ||
+        (n.classList.contains('info') && n.getRootNode && n.getRootNode().host && n.getRootNode().host.classList.contains('hk-card-host'))))) return;
       if (path.includes(host)) { closeMeta(); return; }
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -4040,11 +4284,16 @@
       if (ready) {
         p.style.transition = 'none';
         p.classList.add('ok');
+        z.style.transition = 'none';
+        z.classList.add('pg-on');
+        void z.offsetWidth;
+        z.style.transition = '';
       } else {
         p.addEventListener('load', () => {
           p.classList.add('ok');
+          z.classList.add('pg-on');
           const t = z.querySelector('.hk-z-thumb');
-          if (t) t.style.opacity = '0';
+          if (t) t.classList.add('gone');
         }, { once: true });
       }
     }
@@ -4059,7 +4308,8 @@
     if (zRaw !== null) {
       let o = {};
       try { o = JSON.parse(zRaw) || {}; } catch (e) {}
-      zoomEl = makeZoomEl(o.thumb || '', o.page || '', null);
+      // 앞 화면에서 이미 회색까지 바뀌었으므로, 여기서는 섬네일 없이 회색에서 1페이지로만 바뀐다
+      zoomEl = makeZoomEl(o.gray ? '' : (o.thumb || ''), o.page || '', null);
       document.documentElement.appendChild(zoomEl);
     } else {
       const ov = fxEnsureOv();
@@ -4119,11 +4369,41 @@
     });
   }
 
-  function fxLeaveUI() {
-    try { sessionStorage.setItem('hk_enter', '1'); } catch (e) {}
-    const h = document.getElementById('hk-host');
-    const r = h && h.shadowRoot && h.shadowRoot.getElementById('root');
-    if (r) r.classList.add('leave');
+  // 다음 화면이 이어받을 수 있게 하단 알약의 폭과 들어 있던 버튼을 적어 둔다
+  // done: 이미 다음 화면 모양으로 바꿔 두었으면 다음 화면은 애니메이션 없이 그대로 보여 준다
+  function saveBarState(done) {
+    try {
+      const h = document.getElementById('hk-host');
+      const r = h && h.shadowRoot;
+      const bar = r && r.getElementById('bar');
+      if (!bar) return;
+      const ids = Array.from(bar.children).map(c => c.id).filter(Boolean);
+      ['tl', 'filt'].forEach(k => { if (r.getElementById(k)) ids.push(k); });
+      sessionStorage.setItem('hk_bar', JSON.stringify({ w: bar.offsetWidth, ids, t: Date.now(), done: !!done }));
+      if (done) return;
+      // 다음 화면에 없을 정렬 버튼 같은 것은 미리 접어 둔다
+      ['filt', 'tl'].forEach(k => {
+        const e = r.getElementById(k);
+        if (e && e.animate) e.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.6)' }],
+          { duration: 260, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' });
+      });
+    } catch (e) {}
+  }
+
+  function morphUiTo(url, dur) {
+    let ok = false;
+    try { ok = !!(window.__hkMorphTo && window.__hkMorphTo(url, dur)); } catch (e) {}
+    saveBarState(ok);
+    return ok;
+  }
+
+  function leaveTo(url) {
+    const ok = morphUiTo(url, 320);
+    setTimeout(() => { location.href = url; }, ok ? 300 : 0);
+  }
+
+  function fxLeaveUI(url, dur) {
+    morphUiTo(url, dur);
   }
 
   function fxGo(url, opt) {
@@ -4141,22 +4421,27 @@
       z.style.height = '100vh';
       z.style.borderRadius = '0px';
       const zp = z.querySelector('.hk-z-page'), zt = z.querySelector('.hk-z-thumb');
-      const zgo = () => { if (zp) zp.classList.add('ok'); if (zt) zt.style.opacity = '0'; };
-      if (zp && zp.complete && zp.naturalWidth) zgo();
-      else if (zp) zp.addEventListener('load', zgo, { once: true });
+      // 커지는 동안 섬네일이 스르륵 사라지며 회색이 되고, 다 커진 뒤 1페이지가 나타난다
+      requestAnimationFrame(() => { if (zt) zt.classList.add('gone'); });
+      const zgo = () => { if (zp) zp.classList.add('ok'); z.classList.add('pg-on'); };
+      setTimeout(() => {
+        if (zp && zp.complete && zp.naturalWidth) zgo();
+        else if (zp) zp.addEventListener('load', zgo, { once: true });
+      }, 440);
       try {
-        sessionStorage.setItem('hk_zoom', JSON.stringify({ thumb: opt.thumb || '', page: opt.page || '' }));
+        sessionStorage.setItem('hk_zoom', JSON.stringify({ thumb: opt.thumb || '', page: opt.page || '', gray: true }));
       } catch (e) {}
     }
     ov.classList.add('on');
-    fxLeaveUI();
+    fxLeaveUI(url, z ? 420 : 260);
     const zpImg = z ? z.querySelector('.hk-z-page') : null;
     const navigate = () => { location.href = url; };
     setTimeout(() => {
       if (zpImg && !(zpImg.complete && zpImg.naturalWidth)) {
         zpImg.addEventListener('load', () => setTimeout(navigate, 400), { once: true });
         setTimeout(navigate, 1000);
-      } else navigate();
+      } else if (zpImg) setTimeout(navigate, 360);
+      else navigate();
     }, z ? 470 : 280);
     setTimeout(() => {
       fxBusy = false;
@@ -4172,7 +4457,7 @@
     const hostEl = path.find(n => n && n.classList && n.classList.contains('hk-card-host'));
     if (!hostEl || !hostEl.shadowRoot) return;
     if (window.__hkMetaOpen && window.__hkMetaOpen()) return;
-    if (path.some(n => n && n.classList && (n.classList.contains('grp') || n.classList.contains('grplist') || n.classList.contains('dots')))) return;
+    if (path.some(n => n && n.classList && (n.classList.contains('grp') || n.classList.contains('grplist') || n.classList.contains('dots') || n.classList.contains('info')))) return;
     const sh = hostEl.shadowRoot;
     const a = sh.querySelector('.thumb');
     const cardEl = sh.querySelector('.card');
@@ -4235,6 +4520,31 @@
   const Z_MIN = 0.7, Z_MAX = 5;
   let zoom = 1, panX = 0, panY = 0, panMaxX = 0, panMaxY = 0;
 
+  // 확대·이동 값은 문서 전체가 아니라 이미지가 든 상자에만 적고, 손가락이 움직여도 한 프레임에 한 번만 적는다
+  // (문서 전체에 적으면 매번 모든 요소의 스타일을 다시 계산해서 끊겨 보인다)
+  const zv = { z: 1, px: 0, py: 0 };
+  let zvRaf = 0;
+  function zoomBoxes() {
+    return [document.getElementById('mobileImages'), document.getElementById('comicImages'), turnWrap].filter(Boolean);
+  }
+  function writeZoomVars(e) {
+    const st = e.style;
+    st.setProperty('--hk-z', String(zv.z));
+    st.setProperty('--hk-px', zv.px + 'px');
+    st.setProperty('--hk-py', zv.py + 'px');
+  }
+  function flushZoomVars() {
+    zvRaf = 0;
+    zoomBoxes().forEach(writeZoomVars);
+  }
+  function setZoomVars(o, now) {
+    if (o.z != null) zv.z = Math.round(o.z * 1000) / 1000;
+    if (o.px != null) zv.px = Math.round(o.px);
+    if (o.py != null) zv.py = Math.round(o.py);
+    if (now) { cancelAnimationFrame(zvRaf); flushZoomVars(); return; }
+    if (!zvRaf) zvRaf = requestAnimationFrame(flushZoomVars);
+  }
+
   function measurePan() {
     let w = 0, h = 0;
     document.querySelectorAll('#mobileImages img, #comicImages img, img.hk-pg').forEach(im => {
@@ -4252,16 +4562,13 @@
   }
 
   function applyPan(soft) {
-    const rs = document.documentElement.style;
     if (soft) {
-      rs.setProperty('--hk-px', Math.round(rubber(panX, panMaxX)) + 'px');
-      rs.setProperty('--hk-py', Math.round(rubber(panY, panMaxY)) + 'px');
+      setZoomVars({ px: rubber(panX, panMaxX), py: rubber(panY, panMaxY) });
       return;
     }
     panX = Math.max(-panMaxX, Math.min(panMaxX, panX));
     panY = Math.max(-panMaxY, Math.min(panMaxY, panY));
-    rs.setProperty('--hk-px', Math.round(panX) + 'px');
-    rs.setProperty('--hk-py', Math.round(panY) + 'px');
+    setZoomVars({ px: panX, py: panY });
   }
 
   function setZoom(z) {
@@ -4271,22 +4578,20 @@
     panX *= k;
     panY *= k;
     zoom = nz;
-    document.documentElement.style.setProperty('--hk-z', String(Math.round(zoom * 1000) / 1000));
+    setZoomVars({ z: zoom });
     measurePan();
-    applyPan();
+    applyPan(pinch != null);
   }
 
   function resetZoom() {
     zoom = 1; panX = 0; panY = 0;
-    const rs = document.documentElement.style;
-    rs.setProperty('--hk-z', '1');
-    rs.setProperty('--hk-px', '0px');
-    rs.setProperty('--hk-py', '0px');
+    setZoomVars({ z: 1, px: 0, py: 0 }, true);
     measurePan();
   }
 
-  const TURN_DUR = 340;
-  const TURN_N = 20;
+  // 팝업이 열릴 때와 같은 스프링(강성 260 · 감쇠 22)을 쓴다
+  const TURN_DUR = 600;
+  const TURN_N = 36;
   const TURN_DIST = 0.42;
   const TURN_FLIP = false;
   const DRAG_START = 8;
@@ -4362,6 +4667,7 @@
       turnWrap.className = 'hk-wrap';
       turnWrap.style.cssText = 'position:fixed!important;left:0!important;top:0!important;right:0!important;bottom:0!important;' +
         'pointer-events:none!important;overflow:hidden!important;z-index:2147483601!important;';
+      writeZoomVars(turnWrap);
     }
     (document.documentElement || document.body).appendChild(turnWrap);
     return turnWrap;
@@ -4406,13 +4712,23 @@
     return { x: m ? m.m41 : 0, s: m && m.a ? m.a : 1, o: parseFloat(cs.opacity) || 0 };
   }
 
-  // 나가는 페이지는 화면 폭만큼 옆으로 밀려 나간다. 들어오는 페이지가 바로 옆에 붙어 같이 움직이므로 겹치지 않는다
+  // 두 페이지 사이 간격(화면 폭의 배수). 들어오는 페이지가 1.12배로 커져 있어도 나가는 페이지와 닿지 않는 거리다
+  const TURN_GAP = 1.1;
+  const turnGap = () => window.innerWidth * TURN_GAP;
+  const inScale = dir => (dir > 0 ? 1.12 : 0.88);
+  const dragLook = (dx, dir) => {
+    const p = Math.min(1, Math.abs(dx) / window.innerWidth);
+    const s0 = inScale(dir);
+    return { sOut: 1 - 0.08 * p, oOut: 1 - 0.6 * p, sIn: s0 + (1 - s0) * p, oIn: p };
+  };
+
+  // 나가는 페이지는 줄어들며 흐려지고, 들어오는 페이지는 간격을 둔 채 같이 움직이며 제 크기로 돌아온다
   function leave(layer, side, W) {
     const p = poseOf(layer);
     freezeLayer(layer);
     leaving.add(layer);
     syncActive();
-    slide(layer, p.x, side * W, p.s, p.s, p.o, p.o);
+    slide(layer, p.x, side * W, p.s, 0.92, p.o, 0);
     setTimeout(() => {
       try { layer.remove(); } catch (e) {}
       leaving.delete(layer);
@@ -4421,7 +4737,7 @@
   }
 
   function slide(layer, x0, x1, s0 = 1, s1 = 1, o0 = 1, o1 = 1) {
-    const p = springKeys(0, 1, 175, 21, TURN_N);
+    const p = springKeys(0, 1, 260, 22, TURN_N);
     p[p.length - 1] = 1;
     layer.animate(p.map(t => ({
       transform: `translate3d(${(x0 + (x1 - x0) * t).toFixed(1)}px,0,0) scale(${(s0 + (s1 - s0) * t).toFixed(4)})`,
@@ -4489,11 +4805,11 @@
     if (turnWrap) turnWrap.querySelectorAll('.hk-spin').forEach(n => n.remove());
   }
 
-  function setPx(x) { document.documentElement.style.setProperty('--hk-px', Math.round(x) + 'px'); }
+  function setPx(x) { setZoomVars({ px: x }); }
   let bounceT = 0;
   function snapPx() {
     const root = document.documentElement;
-    if (!(parseFloat(root.style.getPropertyValue('--hk-px')) || 0)) return;
+    if (!zv.px) return;
     clearTimeout(bounceT);
     root.classList.add('hk-zanim');
     setPx(0);
@@ -4517,11 +4833,17 @@
   }
 
   function turn(dir) {
-    busyFor(TURN_DUR + 120);
-    if (zoom > 1.01) resetZoom();
+    turnTo(fxPage() + dir, dir);
+  }
+
+  // 원하는 페이지로 넘긴다 (미리보기에서 고른 페이지도 같은 애니메이션)
+  function turnTo(next, dirHint) {
     const total = fxTotal();
     const cur = fxPage();
-    const next = cur + dir;
+    const dir = dirHint || Math.sign(next - cur);
+    if (!dir) return;
+    busyFor(TURN_DUR + 120);
+    if (zoom > 1.01) resetZoom();
     if (next < 1 || (total && next > total)) { edgeBounce(dir); return; }
 
     const gid = getCurrentId();
@@ -4545,7 +4867,7 @@
     const my = ++turnSeq;
     coverUp();
     ensureWrap();
-    const W = window.innerWidth;
+    const W = turnGap();
     const realBefore = findReaderImg();
     const attrBefore = realBefore ? realBefore.getAttribute('src') : null;
     markOwn(next);
@@ -4571,7 +4893,7 @@
       const inL = fitLayer(info.src, info.nw, info.nh);
       ensureWrap().appendChild(inL);
       shown = info;
-      slide(inL, ox - side * W, 0);
+      slide(inL, ox - side * W, 0, inScale(dir), 1, 0, 1);
       curLayer = inL;
       press(0, 10);
     }).catch(() => {
@@ -4635,18 +4957,19 @@
 
   // 손가락을 1:1로 따라가고, 들어오는 페이지는 화면 폭만큼 떨어진 바로 옆에 붙어 있다
   function dragMove(dx) {
-    const W = window.innerWidth;
+    const W = turnGap();
     busyFor(160);
     if (drag.edge) { setPx(rubberX(dx)); return; }
     dragAddIn();
     const x = drag.ox + dx;
+    const k = dragLook(dx, drag.dir);
     if (drag.outL) {
-      drag.outL.style.transform = `translate3d(${x.toFixed(1)}px,0,0)`;
-      drag.outL.style.opacity = '1';
+      drag.outL.style.transform = `translate3d(${x.toFixed(1)}px,0,0) scale(${k.sOut.toFixed(4)})`;
+      drag.outL.style.opacity = k.oOut.toFixed(3);
     }
     if (drag.inL) {
-      drag.inL.style.transform = `translate3d(${(x - drag.dir * W).toFixed(1)}px,0,0)`;
-      drag.inL.style.opacity = '1';
+      drag.inL.style.transform = `translate3d(${(x - drag.dir * W).toFixed(1)}px,0,0) scale(${k.sIn.toFixed(4)})`;
+      drag.inL.style.opacity = k.oIn.toFixed(3);
     }
     if (!drag.outL && !drag.inL) setPx(rubberX(dx));
   }
@@ -4655,18 +4978,18 @@
     busyFor(TURN_DUR + 120);
     snapPx();
     if (drag.edge) return;
-    const W = window.innerWidth, d = drag.dir, my = turnSeq;
+    const W = turnGap(), d = drag.dir, my = turnSeq;
     const ol = drag.outL, il = drag.inL;
     drag.outL = null;
     drag.inL = null;
     if (ol) {
       const p = poseOf(ol);
-      slide(ol, p.x, 0);
+      slide(ol, p.x, 0, p.s, 1, p.o, 1);
       curLayer = ol;
     }
     if (il) {
       const p = poseOf(il);
-      slide(il, p.x, -d * W);
+      slide(il, p.x, -d * W, p.s, inScale(d), p.o, 0);
       setTimeout(() => { try { il.remove(); } catch (e) {} }, TURN_DUR + 40);
     }
     if (!ol) {
@@ -4678,7 +5001,7 @@
 
   function dragCommit() {
     busyFor(TURN_DUR + 120);
-    const W = window.innerWidth, d = drag.dir;
+    const W = turnGap(), d = drag.dir;
     const ol = drag.outL, il = drag.inL;
     drag.outL = null;
     drag.inL = null;
@@ -4689,14 +5012,14 @@
       const po = poseOf(ol);
       leaving.add(ol);
       syncActive();
-      slide(ol, po.x, d * W);
+      slide(ol, po.x, d * W, po.s, 0.92, po.o, 0);
       setTimeout(() => {
         try { ol.remove(); } catch (e) {}
         leaving.delete(ol);
         syncActive();
       }, TURN_DUR + 40);
     }
-    slide(il, pi.x, 0);
+    slide(il, pi.x, 0, pi.s, 1, pi.o, 1);
     shown = drag.info;
     curLayer = il;
     press(0, 10);
