@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.11.0
+// @version      1.11.1
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.11.0';
+  const VERSION = '1.11.1';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -3976,8 +3976,8 @@
         [ICON.sort, '정렬', '왼쪽 아래 버튼으로 최신 · 인기 순을 바꿔요.']
       ],
       reader: [
-        [HI.tap, '탭', '누르는 순간 넘어가요. 왼쪽은 다음, 오른쪽은 이전. 키보드 ← → 도 돼요.'],
-        [HI.swipe, '밀기', '민 방향으로 넘어가요. 오른쪽으로 밀면 다음, 왼쪽은 이전이에요.'],
+        [HI.tap, '이미지 누르기', '누르는 순간 넘어가요. 왼쪽은 다음, 오른쪽은 이전. 이미지 밖은 눌러도 그대로예요.'],
+        [HI.swipe, '끌기', '손가락을 따라오고, 조금만 밀어도 넘어가요. 키보드 ← → 도 돼요.'],
         [HI.pinch, '두 손가락', '확대하고 이동해요. ↺ 버튼을 누르면 원래 크기로 돌아와요.'],
         [HI.grid, '1 / N', '미리 받은 페이지를 보고 바로 그 페이지로 가요.'],
         [HI.star, '별 5개', '별점을 누르고 별명을 정하면 일지에 남아요.'],
@@ -5099,7 +5099,8 @@
     leaving.add(layer);
     syncActive();
     slide(layer, p.x, side * W, p.s, 0.92, p.o, 0);
-    setTimeout(() => {
+    clearTimeout(layer._rmT);
+    layer._rmT = setTimeout(() => {
       try { layer.remove(); } catch (e) {}
       leaving.delete(layer);
       syncActive();
@@ -5286,6 +5287,57 @@
     return im && im.complete && im.naturalWidth ? im : null;
   }
 
+  // 지금 페이지 이미지가 화면에 놓이는 자리 (넘기는 중이어도 도착할 자리 기준)
+  function imageRectNow() {
+    let nw = 0, nh = 0;
+    if ((curLayer || holdLayer) && shown && shown.nw) { nw = shown.nw; nh = shown.nh; }
+    else {
+      const im = findReaderImg();
+      if (im && im.naturalWidth) { nw = im.naturalWidth; nh = im.naturalHeight; }
+    }
+    if (!nw || !nh) return null;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const k = Math.min(vw / nw, vh / nh);
+    const w = nw * k, h = nh * k;
+    return { left: (vw - w) / 2, top: (vh - h) / 2, right: (vw + w) / 2, bottom: (vh + h) / 2 };
+  }
+  function onImage(x, y) {
+    const r = imageRectNow();
+    if (!r) return true; // 아직 이미지 크기를 모르면 막지 않는다
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  }
+
+  // 누르는 순간 시작한 넘김을 되감고, 원래 페이지에서 손가락을 따라오는 끌기로 바꾼다
+  function tapToDrag(dir) {
+    const orig = drag.orig;
+    let origLayer = null;
+    if (holdLayer) {
+      origLayer = holdLayer;
+      holdLayer = null;
+    } else {
+      leaving.forEach(l => { origLayer = l; });
+      if (origLayer) {
+        clearTimeout(origLayer._rmT);
+        leaving.delete(origLayer);
+        syncActive();
+      }
+    }
+    const tapLayer = curLayer;
+    curLayer = null;
+    if (tapLayer && tapLayer !== origLayer) {
+      freezeLayer(tapLayer);
+      try { tapLayer.remove(); } catch (e) {}
+    }
+    ++turnSeq;
+    hideSpin();
+    if (fxPage() !== orig) {
+      markOwn(orig);
+      location.hash = '#' + orig;
+    }
+    if (origLayer) { freezeLayer(origLayer); curLayer = origLayer; }
+    dragBegin(dir);
+  }
+
   function dragAddIn() {
     if (drag.inL || !drag.files) return;
     const im = pageReady(drag.next - 1);
@@ -5462,7 +5514,7 @@
         drag.mode = 0;
         // 손가락이 닿는 순간 바로 넘긴다 (손을 뗄 때까지 기다리지 않음). 확대 중에는 넘기지 않는다
         const path = e.composedPath();
-        if (zoom <= 1.01 && (isImagePath(path) || !isInteractive(path))) {
+        if (zoom <= 1.01 && (isImagePath(path) || !isInteractive(path)) && onImage(e.clientX, e.clientY)) {
           drag.orig = fxPage();
           drag.tapDir = e.clientX < window.innerWidth / 2 ? 1 : -1;
           drag.mode = 4;
@@ -5489,13 +5541,12 @@
       if (pts.size !== 1 || e.pointerId !== drag.id) return;
       const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
       if (drag.mode === 4) {
-        // 이미 누르는 순간 넘겼다. 그대로 옆으로 밀었는데 민 방향이 반대라면, 민 방향 쪽 페이지로 다시 맞춘다
-        if (Math.abs(dx) >= DRAG_START * 2 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-          const sd = dx > 0 ? 1 : -1;
-          if (sd !== drag.tapDir) turnTo(drag.orig + sd, sd);
-          drag.mode = 3;
-        } else if (Math.abs(dy) >= DRAG_START * 2) drag.mode = 3;
-        return;
+        // 누르는 순간 넘겼지만 그대로 옆으로 끌기 시작하면, 넘김을 되감고 원래 페이지에서 손가락을 따라오게 한다
+        if (Math.abs(dx) < DRAG_START && Math.abs(dy) < DRAG_START) return;
+        if (Math.abs(dx) > Math.abs(dy) * 1.2) {
+          tapToDrag(dx > 0 ? 1 : -1);
+          drag.mode = 2;
+        } else { drag.mode = 3; return; }
       }
       if (drag.mode === 0) {
         if (Math.abs(dx) < DRAG_START && Math.abs(dy) < DRAG_START) return;
@@ -5576,6 +5627,7 @@
       e.preventDefault();
       e.stopImmediatePropagation();
       if (zoom > 1.01) return;
+      if (!onImage(e.clientX, e.clientY)) return;
       turn(e.clientX < window.innerWidth / 2 ? 1 : -1);
     }, true);
 
