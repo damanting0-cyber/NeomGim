@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.10.2
+// @version      1.10.3
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.10.2';
+  const VERSION = '1.10.3';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -4958,7 +4958,7 @@
     measurePan();
   }
 
-  // 팝업과 같은 강성(260)에 감쇠만 높여(22 → 28) 넘친 뒤 되돌아오는 바운스를 줄였다
+  // 팝업과 같은 강성(260)에 감쇠만 높여(22 → 24) 넘친 뒤 되돌아오는 바운스를 줄였다
   const TURN_DUR = 600;
   const TURN_N = 36;
   const TURN_DIST = 0.42;
@@ -5106,7 +5106,7 @@
   }
 
   function slide(layer, x0, x1, s0 = 1, s1 = 1, o0 = 1, o1 = 1) {
-    const p = springKeys(0, 1, 260, 28, TURN_N);
+    const p = springKeys(0, 1, 260, 24, TURN_N);
     p[p.length - 1] = 1;
     layer.animate(p.map(t => ({
       transform: `translate3d(${(x0 + (x1 - x0) * t).toFixed(1)}px,0,0) scale(${(s0 + (s1 - s0) * t).toFixed(4)})`,
