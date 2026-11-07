@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.9.0
+// @version      1.9.1
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -12,12 +12,14 @@
 // @grant        GM_xmlhttpRequest
 // @connect      ltn.hitomi.la
 // @noframes
+// @updateURL    https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js
+// @downloadURL  https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  const VERSION = '1.9.0';
+  const VERSION = '1.9.1';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
