@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.10.3
+// @version      1.11.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.10.3';
+  const VERSION = '1.11.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -2309,8 +2309,9 @@
     });
   }
 
-  const PRE_KEEP_BEHIND = 30;
-  const PRE_KEEP_AHEAD = 40;
+  // 지금 페이지 앞뒤로 10장씩만 받아 두고, 그 밖의 것은 메모리에서 바로 버린다 (많이 쌓이면 넘길 때 버벅임)
+  const PRE_KEEP_BEHIND = 10;
+  const PRE_KEEP_AHEAD = 10;
   const preDone = new Set();
   const preBlob = new Map();
   const preBusy = new Map();
@@ -2331,11 +2332,11 @@
 
   function smallOf(im) {
     try {
-      const w = 360, h = Math.max(1, Math.round(360 * im.naturalHeight / (im.naturalWidth || 1)));
+      const w = 240, h = Math.max(1, Math.round(240 * im.naturalHeight / (im.naturalWidth || 1)));
       const c = document.createElement('canvas');
       c.width = w; c.height = h;
       c.getContext('2d').drawImage(im, 0, 0, w, h);
-      return c.toDataURL('image/jpeg', 0.9);
+      return c.toDataURL('image/jpeg', 0.75);
     } catch (e) { return ''; }
   }
 
@@ -2434,7 +2435,7 @@
         if (next >= 0) preloadPage(gid, files, next);
       }
       preBlob.forEach((u, i) => {
-        if (i < cur - PRE_KEEP_BEHIND || i > cur + PRE_KEEP_AHEAD + 10) {
+        if (i < cur - PRE_KEEP_BEHIND || i > cur + PRE_KEEP_AHEAD) {
           URL.revokeObjectURL(u);
           preBlob.delete(i);
           preImg.delete(i);
@@ -3975,8 +3976,8 @@
         [ICON.sort, '정렬', '왼쪽 아래 버튼으로 최신 · 인기 순을 바꿔요.']
       ],
       reader: [
-        [HI.tap, '탭', '왼쪽은 다음, 오른쪽은 이전 페이지예요. 키보드 ← → 도 돼요.'],
-        [HI.swipe, '끌기', '손가락을 따라오고, 조금만 밀어도 넘어가요.'],
+        [HI.tap, '탭', '누르는 순간 넘어가요. 왼쪽은 다음, 오른쪽은 이전. 키보드 ← → 도 돼요.'],
+        [HI.swipe, '밀기', '민 방향으로 넘어가요. 오른쪽으로 밀면 다음, 왼쪽은 이전이에요.'],
         [HI.pinch, '두 손가락', '확대하고 이동해요. ↺ 버튼을 누르면 원래 크기로 돌아와요.'],
         [HI.grid, '1 / N', '미리 받은 페이지를 보고 바로 그 페이지로 가요.'],
         [HI.star, '별 5개', '별점을 누르고 별명을 정하면 일지에 남아요.'],
@@ -3989,7 +3990,7 @@
         [HI.undo, '되돌리기', '지운 건 아래 알림의 되돌리기로 살려요.']
       ],
       set: [
-        [HI.down, 'Pre Load', '다음 페이지와 목록의 1페이지를 미리 받아 둬요.'],
+        [HI.down, 'Pre Load', '지금 페이지 앞뒤 10장과 목록의 1페이지를 미리 받아 둬요.'],
         [HI.globe, 'Only Korean', '한국어 작품만 보여요. 바꾸면 새로고침해서 적용해요.'],
         [HI.inf, 'Unlimited scroll', '목록을 끝없이 이어 붙여요.'],
         [HI.block, 'Block', '차단한 작품 · 작가를 숨겨요. 차단 목록에서 풀 수 있어요.'],
@@ -5275,7 +5276,7 @@
     hlog('넘김', cur, '→', next, now ? '(미리 받은 파일 사용)' : '(받는 중 · 현재 페이지를 붙잡아 둠)');
   }
 
-  const drag = { id: null, x0: 0, y0: 0, px0: 0, py0: 0, mode: 0, dir: 0, dx: 0, ox: 0, lastX: 0, lastT: 0, v: 0,
+  const drag = { id: null, x0: 0, y0: 0, px0: 0, py0: 0, mode: 0, dir: 0, dx: 0, ox: 0, lastX: 0, lastT: 0, v: 0, orig: 1, tapDir: 0,
     outL: null, inL: null, info: null, next: 0, files: null, edge: false };
   const pts = new Map();
   let pinch = null;
@@ -5440,6 +5441,8 @@
       suppressClick = false;
       if (pts.size === 2) {
         if (drag.mode === 2) dragSnap(drag.dx);
+        // 첫 손가락에 이미 넘겼는데 두 손가락(확대)이었다면 원래 페이지로 돌려 놓는다
+        if (drag.mode === 4 && fxPage() !== drag.orig) turnTo(drag.orig);
         drag.mode = 0;
         const [a, b] = [...pts.values()];
         pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: zoom, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, px0: panX, py0: panY };
@@ -5457,6 +5460,15 @@
         drag.px0 = panX;
         drag.py0 = panY;
         drag.mode = 0;
+        // 손가락이 닿는 순간 바로 넘긴다 (손을 뗄 때까지 기다리지 않음). 확대 중에는 넘기지 않는다
+        const path = e.composedPath();
+        if (zoom <= 1.01 && (isImagePath(path) || !isInteractive(path))) {
+          drag.orig = fxPage();
+          drag.tapDir = e.clientX < window.innerWidth / 2 ? 1 : -1;
+          drag.mode = 4;
+          suppressClick = true;
+          turn(drag.tapDir);
+        }
       }
     }, { capture: true, passive: true });
 
@@ -5476,6 +5488,15 @@
       }
       if (pts.size !== 1 || e.pointerId !== drag.id) return;
       const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+      if (drag.mode === 4) {
+        // 이미 누르는 순간 넘겼다. 그대로 옆으로 밀었는데 민 방향이 반대라면, 민 방향 쪽 페이지로 다시 맞춘다
+        if (Math.abs(dx) >= DRAG_START * 2 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+          const sd = dx > 0 ? 1 : -1;
+          if (sd !== drag.tapDir) turnTo(drag.orig + sd, sd);
+          drag.mode = 3;
+        } else if (Math.abs(dy) >= DRAG_START * 2) drag.mode = 3;
+        return;
+      }
       if (drag.mode === 0) {
         if (Math.abs(dx) < DRAG_START && Math.abs(dy) < DRAG_START) return;
         suppressClick = true;
