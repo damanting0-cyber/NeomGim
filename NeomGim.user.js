@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.13.0
+// @version      1.14.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.13.0';
+  const VERSION = '1.14.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -1040,7 +1040,7 @@
     }
     .pvc { transition: transform .3s var(--ease); }
     .pvc:active { transform: scale(.95); transition-duration: .1s; }
-    .pvc img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .pvc img, .pvc canvas { display: block; width: 100%; height: 100%; object-fit: cover; }
     .pvc.ok { outline: 1px solid rgba(159, 224, 168, 0.55); outline-offset: -1px; }
     .pvc.cur { outline: 2px solid #fff; outline-offset: -2px; }
     .pvn {
@@ -2318,14 +2318,15 @@
     });
   }
 
-  function smallOf(im) {
+  // 1/N 창용 작은 그림: 창을 열었을 때만, 한 번에 몇 장씩 캔버스에 줄여 그린다
+  function smallCanvas(im) {
     try {
-      const w = 240, h = Math.max(1, Math.round(240 * im.naturalHeight / (im.naturalWidth || 1)));
+      const w = 160, h = Math.max(1, Math.round(160 * im.naturalHeight / (im.naturalWidth || 1)));
       const c = document.createElement('canvas');
       c.width = w; c.height = h;
       c.getContext('2d').drawImage(im, 0, 0, w, h);
-      return c.toDataURL('image/jpeg', 0.75);
-    } catch (e) { return ''; }
+      return c;
+    } catch (e) { return null; }
   }
 
   function readerImgUrl(gid, f) {
@@ -2376,9 +2377,6 @@
             if (im.decode) im.decode().catch(() => {});
             preBlob.set(idx, blobUrl);
             preImg.set(idx, im);
-            const makeSmall = () => preSmall.set(idx, smallOf(im));
-            if (typeof requestIdleCallback === 'function') requestIdleCallback(makeSmall, { timeout: 3000 });
-            else setTimeout(makeSmall, 120);
             resolve();
           };
           im.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('decode')); };
@@ -4038,7 +4036,7 @@
         [ICON.sort, '정렬', '하단 알약 왼쪽의 버튼으로 최신 · 인기 순을 바꿔요.']
       ],
       reader: [
-        [HI.tap, '이미지 누르기', '왼쪽은 다음, 오른쪽은 이전 페이지예요. 이미지 밖은 눌러도 그대로예요.'],
+        [HI.tap, '화면 누르기', '왼쪽 절반은 다음, 오른쪽 절반은 이전 페이지예요.'],
         [HI.swipe, '끌기', '손가락을 따라오고, 조금만 밀어도 넘어가요. 키보드 ← → 도 돼요.'],
         [HI.pinch, '두 손가락', '확대하고 이동해요. ↺ 버튼을 누르면 원래 크기로 돌아와요.'],
         [HI.grid, '1 / N', '미리 받은 페이지를 보고 바로 그 페이지로 가요.'],
@@ -4126,6 +4124,7 @@
     function pvKey() {
       return [
         pvCurSrc(),
+        preSmall.size,
         fxPage(),
         fxTotal(),
         Array.from(preDone).sort((a, b) => a - b).join(','),
@@ -4159,35 +4158,40 @@
         grid.textContent = '';
         for (let i = 0; i < total; i++) grid.appendChild(pvCell(i));
       }
+      let budget = 4;
       for (let i = 0; i < total; i++) {
         const c = grid.children[i];
         const isCur = i + 1 === cur;
-        const u = preSmall.get(i) || preBlob.get(i) || (isCur ? pvCurSrc() : '');
-        const lab = u ? '' : (preBusy.has(i) ? '받는 중' : '대기');
-        const k = u + '|' + lab + '|' + isCur + '|' + preDone.has(i);
-        if (c._k === k) continue;
+        let cv = preSmall.get(i) || null;
+        if (!cv && budget > 0 && preImg.has(i)) {
+          budget--;
+          cv = smallCanvas(preImg.get(i));
+          if (cv) preSmall.set(i, cv);
+        }
+        const u = cv ? '' : (isCur ? pvCurSrc() : '');
+        const lab = (cv || u) ? '' : (preBusy.has(i) ? '받는 중' : (preImg.has(i) ? '준비 중' : '대기'));
+        const k = (cv ? 'c' : u) + '|' + lab + '|' + isCur + '|' + preDone.has(i);
+        if (c._k === k && (!cv || cv.parentNode === c)) continue;
         c._k = k;
-        c.classList.toggle('ok', !!(preDone.has(i) || u));
+        c.classList.toggle('ok', !!(preDone.has(i) || cv || u));
         c.classList.toggle('cur', isCur);
-        let im = c.querySelector('img');
-        let w = c.querySelector('.pvw');
-        if (u) {
-          if (w) w.remove();
-          if (!im) {
-            im = document.createElement('img');
-            im.alt = '';
-            c.insertBefore(im, c.firstChild);
-          }
-          if (im.getAttribute('src') !== u) im.src = u;
+        const old = c.querySelector('img, canvas, .pvw');
+        let node;
+        if (cv) node = cv;
+        else if (u) {
+          node = old && old.tagName === 'IMG' ? old : document.createElement('img');
+          node.alt = '';
+          if (node.getAttribute('src') !== u) node.src = u;
         } else {
-          if (im) im.remove();
-          if (!w) {
-            w = el('span', 'pvw');
-            c.insertBefore(w, c.firstChild);
-          }
-          w.textContent = lab;
+          node = old && old.classList && old.classList.contains('pvw') ? old : el('span', 'pvw');
+          node.textContent = lab;
+        }
+        if (old !== node) {
+          if (old) old.remove();
+          c.insertBefore(node, c.firstChild);
         }
       }
+      if (budget === 0) pvSig = '';
       return true;
     }
 
@@ -4969,6 +4973,10 @@
     return [document.getElementById('mobileImages'), document.getElementById('comicImages'), turnWrap].filter(Boolean);
   }
   function writeZoomVars(e) {
+    // 값이 그대로면 쓰지 않는다 (쓸 때마다 그 안의 스타일을 다시 계산함)
+    const sig = zv.z + '|' + zv.px + '|' + zv.py;
+    if (e._hkZv === sig) return;
+    e._hkZv = sig;
     const st = e.style;
     st.setProperty('--hk-z', String(zv.z));
     st.setProperty('--hk-px', zv.px + 'px');
@@ -5025,14 +5033,16 @@
   }
 
   function resetZoom() {
+    // 이미 원래 크기면 아무것도 하지 않는다 (넘길 때마다 레이아웃을 다시 계산하지 않게)
+    if (zoom === 1 && !panX && !panY && zv.z === 1 && !zv.px && !zv.py) return;
     zoom = 1; panX = 0; panY = 0;
+    panMaxX = 0; panMaxY = 0;
     setZoomVars({ z: 1, px: 0, py: 0 }, true);
-    measurePan();
   }
 
-  // 팝업과 같은 강성(260)에 감쇠만 높여(22 → 24) 넘친 뒤 되돌아오는 바운스를 줄였다
-  const TURN_DUR = 600;
-  const TURN_N = 36;
+  // 넘김: 넘치지 않고(바운스 없음) 부드럽게 멈추는 감속 곡선
+  const TURN_DUR = 420;
+  const TURN_EASE = 'cubic-bezier(.22, 1, .36, 1)';
   const TURN_FLIP = false;
   const DRAG_START = 8;
   const DRAG_CUT = 0.12;
@@ -5053,6 +5063,14 @@
   // 넘길 때 하단 버튼이 눌리듯 작아지던 효과는 없앴다
   const press = () => {};
 
+  // 미리 받은 이미지 요소가 지금 화면에 쓰이고 있지 않으면 그것을 그대로 쓴다 (이미 해독되어 있음)
+  function readyEl(src) {
+    for (const im of preImg.values()) {
+      if (im.src === src && !im.isConnected && im.complete && im.naturalWidth) return im;
+    }
+    return null;
+  }
+
   function fitLayer(src, nw, nh) {
     const vw = window.innerWidth, vh = window.innerHeight;
     const s = Math.min(vw / (nw || 1), vh / (nh || 1));
@@ -5060,14 +5078,17 @@
     const layer = document.createElement('div');
     layer.style.cssText = 'position:absolute!important;left:0!important;top:0!important;' +
       'width:100%!important;height:100%!important;transform-origin:50% 50%;will-change:transform,opacity;';
-    const im = new Image();
+    const reuse = readyEl(src);
+    const im = reuse || new Image();
     im.alt = '';
     im.className = 'hk-pg';
-    im.src = src;
+    im.decoding = 'async';
+    if (im.src !== src) im.src = src;
     im.style.cssText = 'position:absolute!important;display:block!important;margin:0!important;padding:0!important;' +
       'left:' + ((vw - w) / 2) + 'px!important;top:' + ((vh - h) / 2) + 'px!important;' +
       'width:' + w + 'px!important;height:' + h + 'px!important;max-width:none!important;max-height:none!important;';
     layer.appendChild(im);
+    layer._fresh = !reuse;
     return layer;
   }
 
@@ -5179,12 +5200,11 @@
   }
 
   function slide(layer, x0, x1, s0 = 1, s1 = 1, o0 = 1, o1 = 1) {
-    const p = springKeys(0, 1, 260, 24, TURN_N);
-    p[p.length - 1] = 1;
-    layer.animate(p.map(t => ({
-      transform: `translate3d(${(x0 + (x1 - x0) * t).toFixed(1)}px,0,0) scale(${(s0 + (s1 - s0) * t).toFixed(4)})`,
-      opacity: Math.min(1, Math.max(0, o0 + (o1 - o0) * t))
-    })), { duration: TURN_DUR, easing: 'linear', fill: 'forwards' });
+    // 시작 · 끝 두 장면만 주고 나머지는 브라우저(합성 스레드)가 채운다 → 프레임마다 계산할 일이 없다
+    layer.animate([
+      { transform: `translate3d(${x0.toFixed(1)}px,0,0) scale(${s0.toFixed(4)})`, opacity: Math.min(1, Math.max(0, o0)) },
+      { transform: `translate3d(${x1.toFixed(1)}px,0,0) scale(${s1.toFixed(4)})`, opacity: Math.min(1, Math.max(0, o1)) }
+    ], { duration: TURN_DUR, easing: TURN_EASE, fill: 'forwards' });
   }
 
   // 미리 받은 파일이 먼저 준비되든, 사이트가 띄운 이미지가 먼저 준비되든 빠른 쪽을 쓴다
@@ -5330,14 +5350,23 @@
       if (my !== turnSeq) return;
       hideSpin();
       if (holdLayer === out) holdLayer = null;
-      let ox = 0;
-      if (out && out.isConnected) { ox = poseOf(out).x; leave(out, side, W); }
       const inL = fitLayer(info.src, info.nw, info.nh);
-      ensureWrap().appendChild(inL);
-      shown = info;
-      slide(inL, ox - side * W, 0, inScale(dir), 1, 0, 1);
-      curLayer = inL;
-      press(0, 10);
+      const inImg = inL.firstChild;
+      const go = () => {
+        if (my !== turnSeq) { try { inL.remove(); } catch (e) {} return; }
+        let ox = 0;
+        if (out && out.isConnected) { ox = poseOf(out).x; leave(out, side, W); }
+        ensureWrap().appendChild(inL);
+        shown = info;
+        slide(inL, ox - side * W, 0, inScale(dir), 1, 0, 1);
+        curLayer = inL;
+      };
+      if (inL._fresh && inImg.decode) {
+        let done = false;
+        const once = () => { if (!done) { done = true; go(); } };
+        inImg.decode().then(once, once);
+        setTimeout(once, 120);
+      } else go();
     }).catch(() => {
       pendingIn--;
       syncActive();
@@ -5356,26 +5385,6 @@
   function pageReady(idx) {
     const im = preImg.get(idx);
     return im && im.complete && im.naturalWidth ? im : null;
-  }
-
-  // 지금 페이지 이미지가 화면에 놓이는 자리 (넘기는 중이어도 도착할 자리 기준)
-  function imageRectNow() {
-    let nw = 0, nh = 0;
-    if ((curLayer || holdLayer) && shown && shown.nw) { nw = shown.nw; nh = shown.nh; }
-    else {
-      const im = findReaderImg();
-      if (im && im.naturalWidth) { nw = im.naturalWidth; nh = im.naturalHeight; }
-    }
-    if (!nw || !nh) return null;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const k = Math.min(vw / nw, vh / nh);
-    const w = nw * k, h = nh * k;
-    return { left: (vw - w) / 2, top: (vh - h) / 2, right: (vw + w) / 2, bottom: (vh + h) / 2 };
-  }
-  function onImage(x, y) {
-    const r = imageRectNow();
-    if (!r) return true; // 아직 이미지 크기를 모르면 막지 않는다
-    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
   }
 
   function dragAddIn() {
@@ -5648,7 +5657,6 @@
       e.preventDefault();
       e.stopImmediatePropagation();
       if (zoom > 1.01) return;
-      if (!onImage(e.clientX, e.clientY)) return;
       turn(e.clientX < window.innerWidth / 2 ? 1 : -1);
     }, true);
 
@@ -5694,6 +5702,7 @@
     document.addEventListener('load', e => {
       const t = e.target;
       if (!t || t.tagName !== 'IMG' || !t.closest('#mobileImages, #comicImages')) return;
+      if (zoom <= 1.01) return;
       measurePan();
       applyPan();
     }, true);
@@ -5706,8 +5715,7 @@
       if (i >= 0) ownPages.splice(0, i + 1);
       else { ownPages.length = 0; endChain(); }
     });
-    window.addEventListener('resize', () => { measurePan(); applyPan(); });
-    setTimeout(() => { measurePan(); applyPan(); }, 700);
+    window.addEventListener('resize', () => { if (zoom > 1.01) { measurePan(); applyPan(); } });
   }
 
   function initReaderViewport() {
