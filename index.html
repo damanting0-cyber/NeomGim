@@ -180,7 +180,7 @@
       <h1>NeomGim 설치하기</h1>
       <p class="lead">NeomGim은 hitomi.la를 휴대폰에서 편하게 보게 해 주는 작은 프로그램이에요. 유저스크립트를 처음 들어 봐도 아래 순서대로 누르기만 하면 5분이면 끝나요.</p>
       <div class="need" data-os="android"><span>안드로이드 휴대폰</span><span>파이어폭스 앱</span><span>인터넷 연결</span></div>
-      <div class="need" data-os="ios" hidden><span>아이폰 (iOS 15 이상)</span><span>사파리</span><span>Tampermonkey 앱 (유료)</span></div>
+      <div class="need" data-os="ios" hidden><span>아이폰 (iOS 15 이상)</span><span>사파리</span><span>Userscripts 앱 (무료)</span></div>
     </header>
     <figure class="shot">
       <img src="shot.jpg" width="520" height="1051" alt="NeomGim을 설치한 파이어폭스 화면. 아래쪽에 품번, 별 5개, 검색·기록·설정 버튼과 H 버튼이 떠 있다.">
@@ -193,10 +193,11 @@
     <h2>먼저 알아 두기</h2>
     <div class="callout">
       <p><strong>유저스크립트</strong>는 특정 사이트에 들어갔을 때 그 화면을 바꿔 주는 작은 코드예요.</p>
-      <p><strong>Tampermonkey</strong>는 그 유저스크립트를 설치하고 실행해 주는 브라우저 확장 기능이에요. 그래서 Tampermonkey를 먼저 깔고, 그다음 NeomGim을 깔아요.</p>
+      <p data-os="android"><strong>Tampermonkey</strong>는 그 유저스크립트를 설치하고 실행해 주는 브라우저 확장 기능이에요. 그래서 Tampermonkey를 먼저 깔고, 그다음 NeomGim을 깔아요.</p>
+      <p data-os="ios" hidden><strong>Userscripts</strong>는 그 유저스크립트를 설치하고 실행해 주는 무료 사파리 확장 앱이에요. 그래서 Userscripts를 먼저 깔고, 그다음 NeomGim을 깔아요.</p>
     </div>
     <p class="note" data-os="android">크롬이나 삼성 인터넷은 이 방법으로 안 돼요. 안드로이드에서는 파이어폭스가 부가 기능을 제대로 지원해서 파이어폭스를 써요.</p>
-    <p class="note" data-os="ios" hidden>아이폰에서는 사파리 확장 기능으로 써요. 크롬 등 다른 앱은 확장 기능을 지원하지 않아요. Tampermonkey는 앱 스토어에서 한 번 결제하는 유료 앱이에요.</p>
+    <p class="note" data-os="ios" hidden>아이폰에서는 사파리 확장 기능으로 써요. 크롬 등 다른 앱은 확장 기능을 지원하지 않아요. Userscripts는 돈이 들지 않아요.</p>
     <p class="tested" data-os="ios" hidden>아이폰 버전은 아직 실제 아이폰에서 확인하지 못했어요. 안 되는 게 있으면 알려 주세요.</p>
   </section>
 
@@ -243,34 +244,34 @@
     <ol class="steps" data-os="ios" hidden>
       <li>
         <div class="step-body">
-          <h3>Tampermonkey 앱 설치</h3>
-          <p>앱 스토어에서 <span class="ui">Tampermonkey</span>를 검색해서 설치하세요. 유료 앱이에요. 설치한 뒤 한 번 열어 두세요.</p>
-          <p class="sub">개발자 이름이 Jan Biniok인 앱이 맞아요. 이름이 비슷한 다른 앱도 있으니 확인하세요.</p>
+          <h3>Userscripts 앱 설치</h3>
+          <p>앱 스토어에서 <span class="ui">Userscripts</span>를 검색해서 설치하세요. 무료예요. 개발자 이름이 Justin Wasack(quoid)인 흰 바탕에 <code>&lt;/&gt;</code> 아이콘 앱이에요.</p>
+          <p>설치한 뒤 앱을 한 번 열고, 스크립트를 보관할 폴더를 고르라고 하면 <span class="ui">파일</span> 앱의 <span class="ui">나의 iPhone</span> 안에 아무 폴더나 하나 고르세요.</p>
         </div>
       </li>
       <li>
         <div class="step-body">
           <h3>사파리에서 켜기</h3>
-          <p>아이폰 <span class="ui">설정</span> → <span class="ui">앱</span> → <span class="ui">Safari</span> → <span class="ui">확장 프로그램</span> → <span class="ui">Tampermonkey</span>로 들어가서 켜세요.</p>
+          <p>아이폰 <span class="ui">설정</span> → <span class="ui">앱</span> → <span class="ui">Safari</span> → <span class="ui">확장 프로그램</span> → <span class="ui">Userscripts</span>로 들어가서 켜세요.</p>
           <p>같은 화면의 웹사이트 권한에서 <span class="ui">허용</span>을 고르세요. 모든 사이트가 싫다면 나중에 hitomi.la에서만 허용해도 돼요.</p>
-          <p class="sub">iOS 버전에 따라 <span class="ui">설정</span> → <span class="ui">Safari</span> → <span class="ui">확장 프로그램</span>으로 바로 보일 수도 있어요. 설치 화면이 새 탭으로 열리니, 잘 안 열리면 <span class="ui">팝업 차단</span>을 잠깐 꺼 두세요.</p>
+          <p class="sub">iOS 버전에 따라 <span class="ui">설정</span> → <span class="ui">Safari</span> → <span class="ui">확장 프로그램</span>으로 바로 보일 수도 있어요.</p>
         </div>
       </li>
       <li>
         <div class="step-body">
           <h3>NeomGim 설치</h3>
-          <p>사파리에서 아래 주소를 여세요. Tampermonkey 설치 화면이 뜨면 <span class="ui">설치</span>를 누르세요.</p>
+          <p>사파리에서 아래 주소를 여세요. 코드가 글자로 쭉 보이는 게 정상이에요.</p>
           <div class="linkbox">
             <a href="https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js" target="_blank" rel="noopener">https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js</a>
             <button class="copy" type="button" data-copy="https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js">복사</button>
           </div>
-          <p class="sub">코드만 글자로 보이면, 주소창 왼쪽의 <span class="ui">가가</span>(또는 퍼즐) 버튼 → <span class="ui">Tampermonkey</span>를 눌러 설치 화면을 여세요.</p>
+          <p>그 상태에서 주소창 왼쪽의 <span class="ui">가가</span>(또는 퍼즐) 버튼 → <span class="ui">Userscripts</span>를 누르면 스크립트를 찾았다는 창이 떠요. <span class="ui">Install</span>을 누르면 끝이에요.</p>
         </div>
       </li>
       <li>
         <div class="step-body">
           <h3>hitomi.la 열기</h3>
-          <p>사파리에서 <code>hitomi.la</code>에 들어가세요. 사파리가 Tampermonkey에 이 사이트 접근을 허용할지 물으면 <span class="ui">허용</span>을 누르세요.</p>
+          <p>사파리에서 <code>hitomi.la</code>에 들어가세요. 사파리가 Userscripts에 이 사이트 접근을 허용할지 물으면 <span class="ui">허용</span>을 누르세요.</p>
           <p>오른쪽 아래에 검색 · 기록 · 설정 버튼과 <span class="ui">H</span> 버튼이 보이면 성공이에요.</p>
         </div>
       </li>
@@ -291,8 +292,10 @@
 
   <section class="section" aria-labelledby="update">
     <h2 id="update">업데이트</h2>
-    <p>따로 할 일은 없어요. 새 버전이 나오면 Tampermonkey가 하루에 한 번쯤 확인해서 알아서 바꿔 줘요.</p>
-    <p class="note">바로 받고 싶으면 NeomGim 설치 주소(3단계)를 다시 열고 <span class="ui">업데이트</span>를 누르세요. 저장해 둔 일지와 기록은 그대로 남아요.</p>
+    <p data-os="android">따로 할 일은 없어요. 새 버전이 나오면 Tampermonkey가 하루에 한 번쯤 확인해서 알아서 바꿔 줘요.</p>
+    <p class="note" data-os="android">바로 받고 싶으면 NeomGim 설치 주소(3단계)를 다시 열고 <span class="ui">업데이트</span>를 누르세요. 저장해 둔 일지와 기록은 그대로 남아요.</p>
+    <p data-os="ios" hidden>사파리 주소창 왼쪽 <span class="ui">가가</span> 버튼 → <span class="ui">Userscripts</span>를 열고 업데이트 확인 버튼을 누르면 새 버전을 받아요. 가끔 한 번씩 눌러 주세요.</p>
+    <p class="note" data-os="ios" hidden>저장해 둔 일지와 기록은 그대로 남아요.</p>
   </section>
 
   <section class="section" aria-labelledby="faq">
@@ -341,45 +344,41 @@
       <details>
         <summary>hitomi.la에 들어가도 화면이 그대로예요</summary>
         <div class="ans">
-          <p>주소창 왼쪽 <span class="ui">가가</span>(또는 퍼즐) 버튼 → <span class="ui">확장 프로그램 관리</span>에서 Tampermonkey가 켜져 있는지 보세요.</p>
-          <p>같은 메뉴에서 Tampermonkey를 눌러 hitomi.la 접근을 <span class="ui">항상 허용</span>으로 바꾸세요.</p>
-          <p>Tampermonkey 앱에서 NeomGim이 켜져 있는지도 확인하세요.</p>
+          <p>주소창 왼쪽 <span class="ui">가가</span>(또는 퍼즐) 버튼 → <span class="ui">확장 프로그램 관리</span>에서 Userscripts가 켜져 있는지 보세요.</p>
+          <p>같은 메뉴에서 Userscripts를 눌러 hitomi.la 접근을 <span class="ui">항상 허용</span>으로 바꾸세요.</p>
+          <p>Userscripts 창에서 NeomGim 옆 스위치가 켜져 있는지도 확인하세요.</p>
         </div>
       </details>
       <details>
-        <summary>설치 주소를 열었는데 코드만 보여요</summary>
+        <summary>Userscripts를 눌러도 Install 이 안 나와요</summary>
         <div class="ans">
-          <p>주소창 왼쪽 <span class="ui">가가</span> 버튼 → <span class="ui">Tampermonkey</span>를 누르면 설치 화면이 열려요. 그래도 안 되면 2단계에서 사파리 확장이 켜져 있는지 확인하세요.</p>
-        </div>
-      </details>
-      <details>
-        <summary>“유효하지 않은 유저스크립트”라고 떠요</summary>
-        <div class="ans">
-          <p>새 버전이 막 올라와서 반영 중일 때 생겨요. 주소를 그대로 복사해서 몇 분 뒤 다시 열어 보세요.</p>
+          <p>설치 주소 페이지가 다 열린 다음에 다시 눌러 보세요. 그래도 안 되면 Userscripts 앱을 열어 보관 폴더가 정해져 있는지 확인하세요.</p>
         </div>
       </details>
       <details>
         <summary>개인 정보 보호 브라우징에서는 안 돼요</summary>
         <div class="ans">
-          <p><span class="ui">설정</span> → <span class="ui">Safari</span> → <span class="ui">확장 프로그램</span> → <span class="ui">Tampermonkey</span>에서 <span class="ui">개인 정보 보호 브라우징에서 허용</span>을 켜세요.</p>
+          <p><span class="ui">설정</span> → <span class="ui">Safari</span> → <span class="ui">확장 프로그램</span> → <span class="ui">Userscripts</span>에서 <span class="ui">개인 정보 보호 브라우징에서 허용</span>을 켜세요.</p>
         </div>
       </details>
       <details>
         <summary>잠깐 끄고 원래 사이트로 보고 싶어요</summary>
         <div class="ans">
-          <p>주소창 왼쪽 <span class="ui">가가</span> 버튼 → <span class="ui">Tampermonkey</span> 메뉴에서 <span class="ui">NeomGim 끄기</span>를 누르세요. 다시 켤 때는 같은 자리에서 <span class="ui">NeomGim 켜기</span>를 누르면 돼요.</p>
+          <p>주소창 왼쪽 <span class="ui">가가</span> 버튼 → <span class="ui">Userscripts</span>에서 NeomGim 옆 스위치를 끄고 새로고침하세요. 다시 켤 때도 같은 자리에서 켜면 돼요.</p>
         </div>
       </details>
       <details>
         <summary>지우고 싶어요</summary>
         <div class="ans">
-          <p>Tampermonkey 앱에서 NeomGim 옆 휴지통 아이콘을 누르세요. Tampermonkey까지 지우려면 앱을 길게 눌러 삭제하면 돼요.</p>
+          <p>Userscripts 창에서 NeomGim을 지우거나, <span class="ui">파일</span> 앱의 보관 폴더에서 <code>NeomGim.user.js</code>를 지우세요. Userscripts까지 지우려면 앱을 길게 눌러 삭제하면 돼요.</p>
         </div>
+      </details>
+    </div>
       </details>
     </div>
   </section>
 
-  <footer>메뉴 이름은 브라우저 · iOS · Tampermonkey 버전에 따라 조금 다를 수 있어요.</footer>
+  <footer>메뉴 이름은 브라우저 · iOS · 확장 앱 버전에 따라 조금 다를 수 있어요.</footer>
 </main>
 
 <script>

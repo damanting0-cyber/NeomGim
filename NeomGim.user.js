@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.15.0
+// @version      1.16.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.15.0';
+  const VERSION = '1.16.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -32,6 +32,43 @@
   const IS_SEARCH = /^\/search\.html$/.test(location.pathname);
 
   const W = () => (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window);
+
+  // 사이트의 작품 정보(galleryinfo). 아이폰 Userscripts 처럼 스크립트가 사이트와 분리된 공간에서 돌면
+  // 사이트 변수를 직접 못 읽으므로, 사이트 안에서 도는 작은 코드로 문서에 적어 두게 하고 그것을 읽는다.
+  let giBridge = null, giAsked = false;
+  function pageGI() {
+    try {
+      const g = W()['galleryinfo'];
+      if (g && g.files) return g;
+    } catch (e) {}
+    if (giBridge) return giBridge;
+    try {
+      const raw = document.documentElement && document.documentElement.getAttribute('data-hk-gi');
+      if (raw) { giBridge = JSON.parse(raw); return giBridge; }
+    } catch (e) {}
+    if (!giAsked && typeof unsafeWindow === 'undefined' && document.documentElement) {
+      giAsked = true;
+      askPageGI();
+    }
+    return null;
+  }
+  function askPageGI() {
+    try {
+      const sc = document.createElement('script');
+      sc.textContent = '(function(){function put(){try{var g=window.galleryinfo;if(g&&g.files){' +
+        'document.documentElement.setAttribute("data-hk-gi",JSON.stringify(g));return true}}catch(e){}return false}' +
+        'if(!put()){var n=0,t=setInterval(function(){if(put()||++n>80)clearInterval(t)},200)}})();';
+      (document.head || document.documentElement).appendChild(sc);
+      sc.remove();
+    } catch (e) {}
+    // 그래도 안 되면 작품 정보 파일을 직접 받아 온다
+    const gid = getCurrentId();
+    if (gid && IS_WORK_PAGE) {
+      fetchGalleryFiles(gid).then(files => {
+        if (files && !giBridge) giBridge = { id: gid, files };
+      }).catch(() => {});
+    }
+  }
 
   const KEY = {
     saved: 'hk_saved',
@@ -1306,7 +1343,7 @@
       if (s && out.indexOf(s) < 0) out.push(s);
     };
     try {
-      const g = W().galleryinfo;
+      const g = pageGI();
       if (g && (!id || String(g.id) === String(id))) {
         (g.artists || []).forEach(a => a && push(a.artist));
       }
@@ -2288,7 +2325,7 @@
     if (!settings.preload) return;
     const gid = getCurrentId();
     if (!gid) return;
-    const g = W().galleryinfo;
+    const g = pageGI();
     const files = (g && g.files && g.files.length && (!g.id || String(g.id) === String(gid))) ? g.files : null;
     (files ? Promise.resolve(files) : fetchGalleryFiles(gid)).then(list => {
       if (!list || !list.length) return;
@@ -2345,7 +2382,7 @@
   }
 
   function readerFiles(gid) {
-    const g = W().galleryinfo;
+    const g = pageGI();
     if (g && g.files && g.files.length && (!g.id || String(g.id) === String(gid))) return g.files;
     return null;
   }
@@ -4939,7 +4976,7 @@
 
   function fxTotal() {
     try {
-      const g = W().galleryinfo;
+      const g = pageGI();
       if (g && g.files) return g.files.length;
     } catch (e) {}
     const sel = document.querySelector('#single-page-select');
@@ -5797,7 +5834,7 @@
     if (fxInfo && fxInfo.id === id) return fxInfo;
     let info = null, failed = false;
     try {
-      const g = W().galleryinfo;
+      const g = pageGI();
       if (g && String(g.id) === String(id)) {
         info = {
           id,
