@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="안드로이드 파이어폭스에서 NeomGim 유저스크립트를 설치하는 방법">
+<meta name="description" content="안드로이드(파이어폭스)와 아이폰(사파리)에서 NeomGim 유저스크립트를 설치하는 방법">
 <title>NeomGim 설치 안내</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -39,6 +39,7 @@
   }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     background: var(--bg); color: var(--ink);
     font-family: var(--font-body); font-size: 16px; line-height: 1.7;
@@ -73,6 +74,21 @@
   }
   .shot figcaption { color: var(--sub); font-size: 12px; line-height: 1.45; text-align: center; }
   @media (max-width: 380px) { .hero h1 { font-size: 26px; } .hero .lead { font-size: 15px; } }
+  /* 위에 떠 있는 안드로이드 / 아이폰 전환 */
+  .ostab {
+    position: sticky; top: calc(env(safe-area-inset-top, 0px) + 10px); z-index: 20;
+    align-self: center; display: flex; gap: 2px; padding: 4px; margin-bottom: -12px;
+    border-radius: 999px; background: color-mix(in srgb, var(--surface) 78%, transparent);
+    border: 1px solid var(--line); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+  }
+  .ostab button {
+    font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+    padding: 8px 18px; border: 0; border-radius: 999px; background: transparent; color: var(--sub);
+    transition: background .2s ease, color .2s ease;
+  }
+  .ostab button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .tested { font-size: 13.5px; color: var(--warn); }
   .section { display: flex; flex-direction: column; gap: 16px; }
   .section > h2 { font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
   .section > .note { color: var(--sub); font-size: 15px; }
@@ -153,12 +169,18 @@
 </head>
 <body>
 <main>
+  <nav class="ostab" aria-label="휴대폰 종류">
+    <button type="button" data-pick="android" aria-pressed="true">안드로이드</button>
+    <button type="button" data-pick="ios" aria-pressed="false">아이폰</button>
+  </nav>
+
   <div class="hero">
     <header>
-      <div class="eyebrow">안드로이드 · 파이어폭스</div>
+      <div class="eyebrow"><span data-os="android">안드로이드 · 파이어폭스</span><span data-os="ios" hidden>아이폰 · 사파리</span></div>
       <h1>NeomGim 설치하기</h1>
       <p class="lead">NeomGim은 hitomi.la를 휴대폰에서 편하게 보게 해 주는 작은 프로그램이에요. 유저스크립트를 처음 들어 봐도 아래 순서대로 누르기만 하면 5분이면 끝나요.</p>
-      <div class="need"><span>안드로이드 휴대폰</span><span>파이어폭스 앱</span><span>인터넷 연결</span></div>
+      <div class="need" data-os="android"><span>안드로이드 휴대폰</span><span>파이어폭스 앱</span><span>인터넷 연결</span></div>
+      <div class="need" data-os="ios" hidden><span>아이폰 (iOS 15 이상)</span><span>사파리</span><span>Tampermonkey 앱 (유료)</span></div>
     </header>
     <figure class="shot">
       <img src="shot.jpg" width="520" height="1051" alt="NeomGim을 설치한 파이어폭스 화면. 아래쪽에 품번, 별 5개, 검색·기록·설정 버튼과 H 버튼이 떠 있다.">
@@ -171,14 +193,16 @@
     <h2>먼저 알아 두기</h2>
     <div class="callout">
       <p><strong>유저스크립트</strong>는 특정 사이트에 들어갔을 때 그 화면을 바꿔 주는 작은 코드예요.</p>
-      <p><strong>Tampermonkey</strong>는 그 유저스크립트를 설치하고 실행해 주는 파이어폭스 부가 기능이에요. 그래서 Tampermonkey를 먼저 깔고, 그다음 NeomGim을 깔아요.</p>
+      <p><strong>Tampermonkey</strong>는 그 유저스크립트를 설치하고 실행해 주는 브라우저 확장 기능이에요. 그래서 Tampermonkey를 먼저 깔고, 그다음 NeomGim을 깔아요.</p>
     </div>
-    <p class="note">크롬이나 삼성 인터넷은 이 방법으로 안 돼요. 안드로이드에서는 파이어폭스가 부가 기능을 제대로 지원해서 파이어폭스를 써요.</p>
+    <p class="note" data-os="android">크롬이나 삼성 인터넷은 이 방법으로 안 돼요. 안드로이드에서는 파이어폭스가 부가 기능을 제대로 지원해서 파이어폭스를 써요.</p>
+    <p class="note" data-os="ios" hidden>아이폰에서는 사파리 확장 기능으로 써요. 크롬 등 다른 앱은 확장 기능을 지원하지 않아요. Tampermonkey는 앱 스토어에서 한 번 결제하는 유료 앱이에요.</p>
+    <p class="tested" data-os="ios" hidden>아이폰 버전은 아직 실제 아이폰에서 확인하지 못했어요. 안 되는 게 있으면 알려 주세요.</p>
   </section>
 
   <section class="section" aria-labelledby="install">
     <h2 id="install">설치 순서</h2>
-    <ol class="steps">
+    <ol class="steps" data-os="android">
       <li>
         <div class="step-body">
           <h3>파이어폭스 설치</h3>
@@ -216,6 +240,41 @@
         </div>
       </li>
     </ol>
+    <ol class="steps" data-os="ios" hidden>
+      <li>
+        <div class="step-body">
+          <h3>Tampermonkey 앱 설치</h3>
+          <p>앱 스토어에서 <span class="ui">Tampermonkey</span>를 검색해서 설치하세요. 유료 앱이에요. 설치한 뒤 한 번 열어 두세요.</p>
+          <p class="sub">개발자 이름이 Jan Biniok인 앱이 맞아요. 이름이 비슷한 다른 앱도 있으니 확인하세요.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>사파리에서 켜기</h3>
+          <p>아이폰 <span class="ui">설정</span> → <span class="ui">앱</span> → <span class="ui">Safari</span> → <span class="ui">확장 프로그램</span> → <span class="ui">Tampermonkey</span>로 들어가서 켜세요.</p>
+          <p>같은 화면의 웹사이트 권한에서 <span class="ui">허용</span>을 고르세요. 모든 사이트가 싫다면 나중에 hitomi.la에서만 허용해도 돼요.</p>
+          <p class="sub">iOS 버전에 따라 <span class="ui">설정</span> → <span class="ui">Safari</span> → <span class="ui">확장 프로그램</span>으로 바로 보일 수도 있어요. 설치 화면이 새 탭으로 열리니, 잘 안 열리면 <span class="ui">팝업 차단</span>을 잠깐 꺼 두세요.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>NeomGim 설치</h3>
+          <p>사파리에서 아래 주소를 여세요. Tampermonkey 설치 화면이 뜨면 <span class="ui">설치</span>를 누르세요.</p>
+          <div class="linkbox">
+            <a href="https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js" target="_blank" rel="noopener">https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js</a>
+            <button class="copy" type="button" data-copy="https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js">복사</button>
+          </div>
+          <p class="sub">코드만 글자로 보이면, 주소창 왼쪽의 <span class="ui">가가</span>(또는 퍼즐) 버튼 → <span class="ui">Tampermonkey</span>를 눌러 설치 화면을 여세요.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>hitomi.la 열기</h3>
+          <p>사파리에서 <code>hitomi.la</code>에 들어가세요. 사파리가 Tampermonkey에 이 사이트 접근을 허용할지 물으면 <span class="ui">허용</span>을 누르세요.</p>
+          <p>오른쪽 아래에 검색 · 기록 · 설정 버튼과 <span class="ui">H</span> 버튼이 보이면 성공이에요.</p>
+        </div>
+      </li>
+    </ol>
   </section>
 
   <section class="section" aria-labelledby="use">
@@ -233,12 +292,12 @@
   <section class="section" aria-labelledby="update">
     <h2 id="update">업데이트</h2>
     <p>따로 할 일은 없어요. 새 버전이 나오면 Tampermonkey가 하루에 한 번쯤 확인해서 알아서 바꿔 줘요.</p>
-    <p class="note">바로 받고 싶으면 3단계 주소를 다시 열고 <span class="ui">업데이트</span>를 누르세요. 저장해 둔 일지와 기록은 그대로 남아요.</p>
+    <p class="note">바로 받고 싶으면 NeomGim 설치 주소(3단계)를 다시 열고 <span class="ui">업데이트</span>를 누르세요. 저장해 둔 일지와 기록은 그대로 남아요.</p>
   </section>
 
   <section class="section" aria-labelledby="faq">
     <h2 id="faq">안 될 때</h2>
-    <div>
+    <div data-os="android">
       <details>
         <summary>hitomi.la에 들어가도 화면이 그대로예요</summary>
         <div class="ans">
@@ -278,12 +337,76 @@
         </div>
       </details>
     </div>
+    <div data-os="ios" hidden>
+      <details>
+        <summary>hitomi.la에 들어가도 화면이 그대로예요</summary>
+        <div class="ans">
+          <p>주소창 왼쪽 <span class="ui">가가</span>(또는 퍼즐) 버튼 → <span class="ui">확장 프로그램 관리</span>에서 Tampermonkey가 켜져 있는지 보세요.</p>
+          <p>같은 메뉴에서 Tampermonkey를 눌러 hitomi.la 접근을 <span class="ui">항상 허용</span>으로 바꾸세요.</p>
+          <p>Tampermonkey 앱에서 NeomGim이 켜져 있는지도 확인하세요.</p>
+        </div>
+      </details>
+      <details>
+        <summary>설치 주소를 열었는데 코드만 보여요</summary>
+        <div class="ans">
+          <p>주소창 왼쪽 <span class="ui">가가</span> 버튼 → <span class="ui">Tampermonkey</span>를 누르면 설치 화면이 열려요. 그래도 안 되면 2단계에서 사파리 확장이 켜져 있는지 확인하세요.</p>
+        </div>
+      </details>
+      <details>
+        <summary>“유효하지 않은 유저스크립트”라고 떠요</summary>
+        <div class="ans">
+          <p>새 버전이 막 올라와서 반영 중일 때 생겨요. 주소를 그대로 복사해서 몇 분 뒤 다시 열어 보세요.</p>
+        </div>
+      </details>
+      <details>
+        <summary>개인 정보 보호 브라우징에서는 안 돼요</summary>
+        <div class="ans">
+          <p><span class="ui">설정</span> → <span class="ui">Safari</span> → <span class="ui">확장 프로그램</span> → <span class="ui">Tampermonkey</span>에서 <span class="ui">개인 정보 보호 브라우징에서 허용</span>을 켜세요.</p>
+        </div>
+      </details>
+      <details>
+        <summary>잠깐 끄고 원래 사이트로 보고 싶어요</summary>
+        <div class="ans">
+          <p>주소창 왼쪽 <span class="ui">가가</span> 버튼 → <span class="ui">Tampermonkey</span> 메뉴에서 <span class="ui">NeomGim 끄기</span>를 누르세요. 다시 켤 때는 같은 자리에서 <span class="ui">NeomGim 켜기</span>를 누르면 돼요.</p>
+        </div>
+      </details>
+      <details>
+        <summary>지우고 싶어요</summary>
+        <div class="ans">
+          <p>Tampermonkey 앱에서 NeomGim 옆 휴지통 아이콘을 누르세요. Tampermonkey까지 지우려면 앱을 길게 눌러 삭제하면 돼요.</p>
+        </div>
+      </details>
+    </div>
   </section>
 
-  <footer>메뉴 이름은 파이어폭스 · Tampermonkey 버전에 따라 조금 다를 수 있어요.</footer>
+  <footer>메뉴 이름은 브라우저 · iOS · Tampermonkey 버전에 따라 조금 다를 수 있어요.</footer>
 </main>
 
 <script>
+  (function () {
+    var buttons = document.querySelectorAll('[data-pick]');
+    function show(os) {
+      document.querySelectorAll('[data-os]').forEach(function (n) { n.hidden = n.getAttribute('data-os') !== os; });
+      buttons.forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-pick') === os ? 'true' : 'false'); });
+    }
+    function fromHash() {
+      var h = (location.hash || '').replace('#', '');
+      if (h === 'iphone') return 'ios';
+      if (h === 'android') return 'android';
+      return null;
+    }
+    var guess = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'ios' : 'android';
+    show(fromHash() || guess);
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () {
+        var os = b.getAttribute('data-pick');
+        show(os);
+        try { history.replaceState(null, '', '#' + (os === 'ios' ? 'iphone' : 'android')); } catch (e) {}
+      });
+    });
+    window.addEventListener('hashchange', function () { var o = fromHash(); if (o) show(o); });
+  })();
+
   document.querySelectorAll('.copy').forEach(function (b) {
     b.addEventListener('click', function () {
       var text = b.getAttribute('data-copy');
