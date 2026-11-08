@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.14.0
+// @version      1.14.1
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.14.0';
+  const VERSION = '1.14.1';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -5042,7 +5042,7 @@
 
   // 넘김: 넘치지 않고(바운스 없음) 부드럽게 멈추는 감속 곡선
   const TURN_DUR = 420;
-  const TURN_EASE = 'cubic-bezier(.22, 1, .36, 1)';
+  const TURN_EASE = 'ease-out';
   const TURN_FLIP = false;
   const DRAG_START = 8;
   const DRAG_CUT = 0.12;
