@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.16.0
+// @version      1.17.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.16.0';
+  const VERSION = '1.17.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -983,11 +983,27 @@
     .cmb {
       -webkit-appearance: none; appearance: none; border: 0; background: none; cursor: pointer; flex: none;
       display: flex; flex-direction: column; align-items: center; gap: 3px;
-      width: 44px; padding: 6px 0 5px; border-radius: 12px; color: #fff;
+      min-width: 44px; padding: 6px 7px 5px; border-radius: 12px; color: #fff;
       font: inherit; font-size: 10.5px; font-weight: 600; white-space: nowrap;
       transition: background .2s ease, transform .3s var(--ease);
     }
     .cmb svg { width: 16px; height: 16px; display: block; }
+    .cmb.gold { color: #ffd54a; }
+    .item.life { box-shadow: inset 0 0 0 1.5px rgba(255, 213, 74, 0.55); background: rgba(255, 213, 74, 0.08); }
+    .st.life { color: #ffd54a; }
+    .st svg.six {
+      color: #ffb3d1; fill: currentColor;
+      filter: drop-shadow(0 0 3px rgba(255, 170, 120, 0.95));
+      transform-origin: 50% 50%;
+    }
+    .st svg.six.pop { animation: hkSix .9s cubic-bezier(.22, 1, .36, 1) .25s backwards; }
+    @keyframes hkSix {
+      0% { transform: scale(0) rotate(-140deg); opacity: 0; }
+      55% { transform: scale(1.8) rotate(12deg); opacity: 1; }
+      100% { transform: none; opacity: 1; }
+    }
+    .sdiv .sdl.life { display: inline-flex; align-items: center; gap: 6px; }
+    .sdiv .sdl.life .sdt { color: #ffb3d1; }
     .cmb:active { background: rgba(255, 255, 255, 0.14); transform: scale(.9); transition-duration: .1s; }
     .cmb.danger { color: #ff8f8f; }
     .ask {
@@ -1306,11 +1322,13 @@
   const savedOf = id => saved.find(s => s.id === id) || null;
   const STAR_D = 'M12 3.6l2.5 5.1 5.6.8-4.1 4 1 5.6L12 16.4l-5 2.7 1-5.6-4.1-4 5.6-.8z';
   const starSvg = on => `<svg class="${on ? 'on' : ''}" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="${STAR_D}"/></svg>`;
-  function starsEl(n) {
+  function starsEl(n, life) {
     const box = document.createElement('span');
-    box.className = 'st';
-    box.title = n + '점';
-    box.innerHTML = [1, 2, 3, 4, 5].map(i => starSvg(i <= n)).join('');
+    box.className = 'st' + (life ? ' life' : '');
+    box.title = life ? '인생작' : n + '점';
+    box.innerHTML = life
+      ? [1, 2, 3, 4, 5].map(() => starSvg(true)).join('') + starSvg(true).replace('<svg class="on"', '<svg class="on six"')
+      : [1, 2, 3, 4, 5].map(i => starSvg(i <= n)).join('');
     return box;
   }
 
@@ -2663,6 +2681,7 @@
 
   ICON.edit = SV('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>');
   ICON.del = SV('<path d="M18 6 6 18M6 6l12 12"/>');
+  ICON.life = SV('<path d="' + 'M12 3.6l2.5 5.1 5.6.8-4.1 4 1 5.6L12 16.4l-5 2.7 1-5.6-4.1-4 5.6-.8z' + '"/><path d="M19.5 2.5v3M18 4h3"/>');
   ICON.copy = SV('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>');
   ICON.journal = SV('<path class="jb" d="M6.5 3H18v18H6.5A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3z"/><path d="M9 3v18"/><path d="M12 8h3.5M12 11.5h3.5"/>');
 
@@ -3521,21 +3540,24 @@
         ? '일지 ' + saved.length + '개'
         : '일지 ' + items.length + ' / ' + saved.length + '개';
       const byStars = settings.jSort === 'stars';
+      const lifeFirst = (a, b) => (b.life ? 1 : 0) - (a.life ? 1 : 0) ||
+        (a.life && b.life ? (b.lifeTs || 0) - (a.lifeTs || 0) : 0);
       if (byStars) {
-        items.sort((a, b) => (+b.stars || 0) - (+a.stars || 0) || (b.ts || 0) - (a.ts || 0));
+        items.sort((a, b) => lifeFirst(a, b) || (+b.stars || 0) - (+a.stars || 0) || (b.ts || 0) - (a.ts || 0));
       } else {
-        items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        items.sort((a, b) => lifeFirst(a, b) || (b.ts || 0) - (a.ts || 0));
       }
       if (!items.length) {
         box.appendChild(el('div', 'empty', saved.length ? '검색 결과가 없습니다' : '작성한 일지가 없습니다'));
         return;
       }
       const per = new Map();
-      if (byStars) items.forEach(s => { const k = +s.stars || 0; per.set(k, (per.get(k) || 0) + 1); });
+      const grpOf = s => (s.life ? 'life' : (+s.stars || 0));
+      if (byStars) items.forEach(s => { const k = grpOf(s); per.set(k, (per.get(k) || 0) + 1); });
       const folded = new Set((settings.jFold || []).map(String));
       let last = null;
       items.forEach(s => {
-        const st = +s.stars || 0;
+        const st = grpOf(s);
         if (byStars && st !== last) {
           last = st;
           const key = String(st);
@@ -3543,8 +3565,9 @@
           const d = el('div', 'sdiv' + (isFold ? ' fold' : ''));
           d.dataset.sk = key;
           d.title = isFold ? '눌러서 펼치기' : '눌러서 접기';
-          const lb = el('span', 'sdl' + (st ? '' : ' none'));
-          if (st) lb.appendChild(starsEl(st));
+          const lb = el('span', 'sdl' + (st ? '' : ' none') + (st === 'life' ? ' life' : ''));
+          if (st === 'life') { lb.appendChild(starsEl(5, true)); lb.appendChild(el('span', 'sdt', '인생작')); }
+          else if (st) lb.appendChild(starsEl(st));
           else lb.textContent = '별점 없음';
           const chev = el('span', 'sdc');
           chev.innerHTML = SV('<path d="M6 9l6 6 6-6"/>');
@@ -3584,7 +3607,7 @@
           });
           box.appendChild(d);
         }
-        const row = el('div', 'item');
+        const row = el('div', 'item' + (s.life ? ' life' : ''));
         row.dataset.id = s.id;
         if (byStars) {
           row.dataset.g = String(st);
@@ -3594,7 +3617,7 @@
         info.title = '클릭: 열기';
         const dt = el('div', 'dt');
         const day = new Date(s.ts).toLocaleDateString('ko-KR');
-        if (s.stars) dt.appendChild(starsEl(s.stars));
+        if (s.life || s.stars) dt.appendChild(starsEl(s.stars, s.life));
         dt.appendChild(el('div', 'dd', day));
         info.append(el('div', 'ttl', s.alias || s.title || dates[s.id] || ''), el('div', 'pid', s.id), dt);
         const foot = el('div', 'foot');
@@ -3602,8 +3625,9 @@
         const tb = thumbEl(s.id);
         info.addEventListener('click', () => goTo(s.id, tb));
         row.append(tb, foot);
-        // 꾹 누르면 카드 아래에 복사 · 수정 · 삭제
+        // 꾹 누르면 카드 아래에 인생작 · 복사 · 수정 · 삭제
         longPress(row, () => [
+          { label: s.life ? '인생작 해제' : '인생작', icon: ICON.life, gold: true, fn: () => toggleLife(s.id) },
           { label: '복사', icon: ICON.copy, fn: () => copyText(s.id).then(() => toast('품번 복사됨')) },
           { label: '수정', icon: ICON.edit, fn: () => openBm(s.id, 'hist') },
           { label: '삭제', icon: ICON.del, danger: true, fn: () => removeCard(row, () => {
@@ -3617,6 +3641,28 @@
         ]);
         box.appendChild(row);
       });
+    }
+
+    function toggleLife(id) {
+      const it = savedOf(id);
+      if (!it) return;
+      it.life = !it.life;
+      it.lifeTs = it.life ? Date.now() : 0;
+      saveList();
+      const body = panel.querySelector('.hbody');
+      reflowList('#items', renderItems);
+      if (it.life) {
+        const row = panel.querySelector('#items .item[data-id="' + id + '"]');
+        const six = row && row.querySelector('.st .six');
+        if (six) six.classList.add('pop');
+        if (row && row.animate) row.animate([
+          { boxShadow: 'inset 0 0 0 1.5px rgba(255, 213, 74, 0), 0 0 0 rgba(255, 190, 90, 0)' },
+          { boxShadow: 'inset 0 0 0 1.5px rgba(255, 213, 74, .9), 0 0 26px rgba(255, 190, 90, .55)', offset: .45 },
+          { boxShadow: 'inset 0 0 0 1.5px rgba(255, 213, 74, .55), 0 0 0 rgba(255, 190, 90, 0)' }
+        ], { duration: 1100, easing: 'ease-out' });
+        if (body) body.scrollTo({ top: 0, behavior: 'smooth' });
+        toast('인생작으로 올렸어요');
+      } else toast('인생작에서 내렸어요');
     }
 
     // 카드(data-id)와 별점 구분선(data-sk)을 같은 열쇠로 묶어, 다시 그린 뒤에도 원래 자리에서 미끄러지게 한다
@@ -3675,7 +3721,7 @@
       closeCardMenu(true);
       const m = el('div', 'cmenu');
       acts.forEach(a => {
-        const b = el('button', 'cmb' + (a.danger ? ' danger' : ''));
+        const b = el('button', 'cmb' + (a.danger ? ' danger' : '') + (a.gold ? ' gold' : ''));
         b.type = 'button';
         b.innerHTML = a.icon;
         b.appendChild(el('span', '', a.label));
@@ -3697,11 +3743,22 @@
       if (m.animate) m.animate([{ opacity: 0, transform: 'translateY(-6px) scale(.8)' }, { opacity: 1, transform: 'none' }],
         { duration: 320, easing: SWAP_EASE });
       // 아래가 가려지면 목록을 살짝 올려 보여 준다
+      // 더 내릴 수 없는 맨 아래 카드면(아래 막대에 가려짐) 메뉴를 카드 위쪽에 띄운다
       if (body) {
         const ft = panel.querySelector('.jfoot');
         const limit = br.bottom - (ft ? ft.offsetHeight + 16 : 8);
         const mb = m.getBoundingClientRect().bottom;
-        if (mb > limit) body.scrollBy({ top: mb - limit, behavior: 'smooth' });
+        const room = body.scrollHeight - body.clientHeight - body.scrollTop;
+        if (mb > limit) {
+          if (mb - limit <= room) body.scrollBy({ top: mb - limit, behavior: 'smooth' });
+          else {
+            m.style.top = 'auto';
+            m.style.bottom = 'calc(100% + 6px)';
+            m.style.transformOrigin = m.style.transformOrigin.replace(/ 0$/, ' 100%');
+            const mt = m.getBoundingClientRect().top;
+            if (mt < br.top + 4) body.scrollBy({ top: mt - br.top - 4, behavior: 'smooth' });
+          }
+        }
       }
     }
     function longPress(row, getActs) {
@@ -3921,6 +3978,7 @@
           if (id && !isSaved(id)) {
             saved.push({
               id, title: (o && o.title) || '', alias: (o && o.alias) || '',
+              life: !!(o && o.life), lifeTs: (o && o.lifeTs) || 0,
               stars: Math.max(0, Math.min(5, Math.round(+(o && o.stars) || 0))),
               arts: Array.isArray(o && o.arts) ? o.arts.slice(0, 16) : [],
               ts: (o && o.ts) || Date.now()
@@ -4082,7 +4140,7 @@
       ],
       journal: [
         [ICON.hist, '기록 · 일지', '본 작품은 기록에, 별점 매긴 작품은 일지에 모여요.'],
-        [HI.hold, '카드 꾹 누르기', '품번 복사 · 수정 · 삭제 메뉴가 떠요.'],
+        [HI.hold, '카드 꾹 누르기', '인생작 · 복사 · 수정 · 삭제 메뉴가 떠요. 인생작은 별이 6개가 되고 항상 맨 위에 있어요.'],
         [ICON.sort, '정렬', '작성일순 · 별점순. 별점순에서는 구분선을 눌러 접어요.'],
         [HI.undo, '되돌리기', '지운 건 아래 알림의 되돌리기로 살려요.']
       ],
