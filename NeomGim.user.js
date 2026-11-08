@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.12.0
+// @version      1.13.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.12.0';
+  const VERSION = '1.13.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -42,14 +42,12 @@
     terms: 'hk_terms',
     dates: 'hk_dates',
     block: 'hk_block',
+    thumbOrd: 'hk_thumb_ord',
+    dateOrd: 'hk_date_ord',
   };
 
-  const hkLog = [];
-  function hlog(...args) {
-    const t = new Date().toLocaleTimeString('ko-KR', { hour12: false });
-    hkLog.push(t + '  ' + args.map(a => (typeof a === 'string' ? a : String(a))).join(' '));
-    if (hkLog.length > 200) hkLog.shift();
-  }
+  // 진단 로그는 없앴다 (기록하지 않음)
+  function hlog() {}
 
   const store = {
     get(key, def) {
@@ -132,14 +130,16 @@
 
   // 새로고침 직후 원래 히토미 화면이 잠깐 보이지 않도록, 스크립트가 시작되자마자 (모든 페이지에서) 화면을 가린다.
   // 첫 정리가 끝나면 걷히고, 혹시 문제가 생겨도 3초 뒤에는 저절로 걷힌다.
-  try {
-    const bootCss = document.createElement('style');
-    bootCss.id = 'hk-boot-css';
-    bootCss.textContent = 'html.hk-boot{background:#111111!important}html.hk-boot body{opacity:0!important}';
-    (document.head || document.documentElement).appendChild(bootCss);
-    document.documentElement.classList.add('hk-boot');
-    setTimeout(() => { try { document.documentElement.classList.remove('hk-boot'); } catch (e) {} }, 3000);
-  } catch (e) {}
+  onRoot(() => {
+    try {
+      const bootCss = document.createElement('style');
+      bootCss.id = 'hk-boot-css';
+      bootCss.textContent = 'html.hk-boot{background:#111111!important}html.hk-boot body{opacity:0!important}';
+      (document.head || document.documentElement).appendChild(bootCss);
+      document.documentElement.classList.add('hk-boot');
+    } catch (e) {}
+  });
+  setTimeout(() => { try { document.documentElement.classList.remove('hk-boot'); } catch (e) {} }, 3000);
 
   function redirectTargetFor(path) {
     if (path === '/' || path === '/index.html') return KOREAN_LINK;
@@ -167,20 +167,51 @@
   if (!Array.isArray(blocks.artists)) blocks.artists = [];
   const saveBlocks = () => store.set(KEY.block, blocks);
 
+  // 캐시 정리 순서: 넣은(갱신한) 순서대로 기억해 두고, 넘치면 가장 오래된 것부터 지운다.
+  // (객체 키는 숫자 순으로 돌아서 '품번이 작은 것'부터 지워지던 문제를 막는다) 일지 · 기록에 있는 작품은 지우지 않는다.
+  function keepIds() {
+    const k = new Set();
+    saved.forEach(x => k.add(String(x.id)));
+    watched.forEach(x => k.add(String(x.id)));
+    return k;
+  }
+  function lruOrder(storeKey, obj, max) {
+    let ord = store.get(storeKey, null);
+    const seen = new Set();
+    ord = (Array.isArray(ord) ? ord : []).map(String).filter(k => (k in obj) && !seen.has(k) && seen.add(k));
+    // 순서를 모르는 예전 항목은 가장 오래된 쪽에 둔다
+    ord = Object.keys(obj).filter(k => !seen.has(k)).concat(ord);
+    return {
+      touch(id) {
+        const i = ord.indexOf(id);
+        if (i >= 0) ord.splice(i, 1);
+        ord.push(id);
+      },
+      trim() {
+        if (ord.length <= max) return;
+        const keep = keepIds();
+        for (let i = 0; i < ord.length && ord.length > max;) {
+          if (keep.has(ord[i])) { i++; continue; }
+          delete obj[ord[i]];
+          ord.splice(i, 1);
+        }
+      },
+      save() { store.set(storeKey, ord); }
+    };
+  }
+
   let thumbs = store.get(KEY.thumbs, {});
-  let thumbsCount = Object.keys(thumbs).length;
+  const thumbOrd = lruOrder(KEY.thumbOrd, thumbs, 1500);
   let thumbsDirty = false;
   function setThumb(id, url) {
     if (!id || !url || /^data:/.test(url)) return;
     if (url.indexOf('//') === 0) url = 'https:' + url;
     id = String(id);
     if (thumbs[id] === url) return;
-    if (!(id in thumbs)) thumbsCount++;
     thumbs[id] = url;
+    thumbOrd.touch(id);
+    thumbOrd.trim();
     thumbsDirty = true;
-    if (thumbsCount > 1500) {
-      for (const k in thumbs) { if (k !== id) { delete thumbs[k]; thumbsCount--; break; } }
-    }
   }
   let thumbsTimer = 0;
   function writeThumbs() {
@@ -189,6 +220,7 @@
     if (!thumbsDirty) return;
     thumbsDirty = false;
     store.set(KEY.thumbs, thumbs);
+    thumbOrd.save();
   }
   function flushThumbs() {
     if (thumbsTimer || !thumbsDirty) return;
@@ -226,18 +258,16 @@
   }
 
   const dates = store.get(KEY.dates, {});
-  let datesCount = Object.keys(dates).length;
+  const dateOrd = lruOrder(KEY.dateOrd, dates, 1500);
   let dateTimer = 0;
   function setDate(id, d) {
     if (!id || !d) return;
     id = String(id);
     if (dates[id] === d) return;
-    if (!(id in dates)) datesCount++;
     dates[id] = d;
+    dateOrd.touch(id);
+    dateOrd.trim();
     paintDate(id);
-    if (datesCount > 1500) {
-      for (const k in dates) { if (k !== id) { delete dates[k]; datesCount--; break; } }
-    }
     clearTimeout(dateTimer);
     dateTimer = setTimeout(flushDates, 800);
   }
@@ -298,7 +328,7 @@
     if (!m) return;
     setDate(id, fmtDate(m));
   }
-  function flushDates() { clearTimeout(dateTimer); store.set(KEY.dates, dates); }
+  function flushDates() { clearTimeout(dateTimer); store.set(KEY.dates, dates); dateOrd.save(); }
   window.addEventListener('pagehide', () => { flushDates(); writeThumbs(); writeTerms(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { flushDates(); writeThumbs(); writeTerms(); }
@@ -434,15 +464,6 @@
       background: #d9dce3;
       transition: padding .3s ease;
     }
-    .dots {
-      position: absolute; right: 6px; bottom: 6px; z-index: 6;
-      width: 24px; height: 24px; padding: 0; border-radius: 50%; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      border: 1px solid rgba(255, 255, 255, 0.38); background: rgba(20, 20, 26, 0.72);
-      color: #fff; font: 700 15px/1 -apple-system, 'Malgun Gothic', sans-serif;
-      letter-spacing: .5px; transition: background .2s ease, transform .2s ease;
-    }
-    .dots:active { transform: scale(.9); }
     .info .title a { cursor: pointer; }
     .title a.cut {
       -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent 100%);
@@ -508,10 +529,6 @@
       from { opacity: 0; transform: translateY(24px) scale(0.98); }
       to   { opacity: 1; transform: none; }
     }
-    @keyframes hkBump {
-      from { transform: scale(.9); opacity: .6; }
-      to   { transform: none; opacity: 1; }
-    }
     @keyframes hkSwap {
       from { opacity: 0; transform: translateY(8px); }
       to   { opacity: 1; transform: none; }
@@ -556,7 +573,6 @@
     }
     .tl .pg:active { transform: scale(.86); opacity: .7; transition-duration: .1s; }
     .tl .pg.active { transform: scale(.9); }
-    .tl .pg.bump { animation: hkBump .34s var(--ease); }
     .tl .ib { width: 34px; height: 34px; }
     .tl .ib svg { width: 17px; height: 17px; }
     .hh { font-size: 15px; font-weight: 800; letter-spacing: .02em; line-height: 1; }
@@ -806,43 +822,8 @@
     .seg.sm .segb { height: 26px; padding: 0 11px; font-size: 11.5px; }
     .jbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
     .jbar .jn { color: var(--sub); font-size: 11.5px; font-weight: 600; padding-left: 4px; }
-    .tfl {
-      position: absolute; left: 3px; right: 3px; bottom: 3px; z-index: 2;
-      display: flex; align-items: center; gap: 4px; height: 34px; padding: 0 3px 0 11px;
-      border-radius: 999px; background: rgba(20, 20, 26, 0.74);
-      border: 1px solid rgba(255, 255, 255, 0.24); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
-      transition: transform .3s var(--ease);
-    }
-    .tfl .tid {
-      flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      color: #fff; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: left;
-    }
-    .tfl .tx {
-      -webkit-appearance: none; appearance: none; flex: none; border: 0; padding: 0; cursor: pointer;
-      width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, 0.14);
-      color: #fff; font-size: 12px; line-height: 28px; text-align: center; transition: background .2s ease, transform .3s var(--ease);
-    }
-    .tfl .tx:active { background: rgba(255, 90, 90, 0.85); transform: scale(.86); }
-    .ibs.on { color: #ffd54a; background: rgba(255, 213, 74, 0.16); border-color: rgba(255, 213, 74, 0.45); }
     .tog.inl { min-height: 40px; margin-top: 10px; }
-    .cdel {
-      position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 3;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-      padding: 8px; border-radius: inherit; background: rgba(14, 14, 18, 0.84);
-      animation: hkSwap .24s var(--ease); transition: opacity .18s ease;
-    }
-    .cdel.out { opacity: 0; }
-    .cdel .cq { color: #fff; font-size: 12.5px; font-weight: 700; text-align: center; line-height: 1.35; }
-    .cdel .cbtns { display: flex; flex-wrap: nowrap; justify-content: center; gap: 5px; max-width: 100%; }
-    .cdel .cb {
-      -webkit-appearance: none; appearance: none; cursor: pointer;
-      flex: none; white-space: nowrap; height: 28px; padding: 0 10px; border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.12);
-      color: #fff; font: inherit; font-size: 11.5px; font-weight: 600;
-      transition: transform .3s var(--ease);
-    }
-    .cdel .cb.yes { background: rgba(255, 90, 90, 0.9); border-color: transparent; }
-    .cdel .cb:active { transform: scale(.9); transition-duration: .1s; }    .panel.cpop {
+    .panel.cpop {
       position: absolute; left: 0; top: 0; width: 300px;
       padding: 14px; border-radius: 22px; max-height: 60vh;
       background: rgba(24, 24, 28, 0.82) !important;
@@ -850,8 +831,6 @@
     .cpop .ttl { font-size: 14.5px; margin-bottom: 2px; }
     .cpop .lbl { margin-top: 10px; }
     .acard { text-decoration: none; color: inherit; cursor: pointer; }
-    .acard .tfl { padding-right: 11px; }
-    .fabwrap { display: flex; justify-content: flex-end; margin-top: 14px; }
     .helpfab {
       -webkit-appearance: none; appearance: none; flex: none; cursor: pointer;
       display: inline-flex; align-items: center; justify-content: center;
@@ -947,19 +926,6 @@
     .row + .row, .row + .list, .lbl + .row, .row + .lbl, .hint + .lbl { margin-top: 8px; }
     .row.wrap-row { flex-wrap: wrap; }
     .list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .acts { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 0 2px 2px; }
-    .ibs {
-      -webkit-appearance: none; appearance: none; border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(255, 255, 255, 0.14); cursor: pointer;
-      width: 100%; height: 34px; border-radius: 999px; color: var(--text);
-      display: inline-flex; align-items: center; justify-content: center;
-      transition: background .2s var(--ease), color .2s var(--ease), transform .2s var(--ease);
-    }
-    .ibs svg { width: 16px; height: 16px; display: block; fill: none; }
-    .ibs .ibl { font-size: 12px; font-weight: 600; margin-left: 5px; }
-    .ibs:active { transform: scale(.86); transition-duration: .1s; }
-    .ibs.ebtn { flex: none; align-self: flex-end; width: 26px; height: 26px; margin: 0 2px 1px 4px; padding: 0; }
-    .ibs.ebtn svg { width: 13px; height: 13px; }
     .item {
       position: relative; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
       display: flex; flex-direction: column; gap: 6px; min-width: 0;
@@ -1012,14 +978,6 @@
     .tb img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .45s ease, transform .6s var(--ease); }
     .tb img.ld { opacity: 1; }
     .tb { position: relative; }
-    .xdel {
-      position: absolute; top: 6px; right: 6px; z-index: 2;
-      width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
-      background: rgba(78, 78, 88, 0.82); color: #fff; font-size: 12px; line-height: 24px; text-align: center;
-      transition: background .2s ease, transform .3s cubic-bezier(.22, 1, .36, 1);
-    }
-    .xdel:active { background: rgba(255, 90, 90, 0.85); transform: scale(.86); }
-    .xdel.lt { left: 4px; right: auto; top: 4px; }
     .foot { display: flex; align-items: flex-start; gap: 2px; padding: 0 0 2px 4px; min-width: 0; flex: 1 0 auto; }
     .info { flex: 1 1 0; min-width: 0; cursor: pointer; }
     .info .id { font-weight: 700; color: #fff; }
@@ -1247,8 +1205,21 @@
     return (t || '').replace(/\s*\|.*$/, '').trim();
   }
 
-  function goTo(id) {
-    location.href = `/${settings.reader ? 'reader' : 'galleries'}/${id}.html`;
+  // fromEl 을 주면 그 자리에서 커지며 열린다 (목록 카드와 같은 전환)
+  function goTo(id, fromEl) {
+    const url = `/${settings.reader ? 'reader' : 'galleries'}/${id}.html`;
+    if (!IS_WORK_PAGE) saveScroll();
+    const r = fromEl && fromEl.getBoundingClientRect ? fromEl.getBoundingClientRect() : null;
+    if (r && r.width > 4 && r.height > 4) {
+      const im = fromEl.querySelector && fromEl.querySelector('img');
+      fxGo(url, {
+        rect: { top: r.top, left: r.left, width: r.width, height: r.height },
+        thumb: im ? (im.currentSrc || im.src || '') : '',
+        page: warmUrl.get(String(id)) || ''
+      });
+      return;
+    }
+    leaveTo(url);
   }
 
   function cardWorkId(card) {
@@ -1359,6 +1330,7 @@
   function recordWatch(titleOnly) {
     const id = getCurrentId();
     if (!id || !IS_WORK_PAGE) return;
+    watched = store.get(KEY.watched, watched);
     let title = getPageTitle();
     if (title && settings.koreanTitle) title = koreanTitle(title);
     const cover = document.querySelector('.cover img, .cover-column img');
@@ -1814,12 +1786,24 @@
     refreshViewed();
   }
 
-  window.addEventListener('pageshow', e => {
-    if (!e.persisted) return;
-    watched = store.get(KEY.watched, []);
+  // 다른 탭에서 바꾼 일지 · 기록 · 차단 · 설정을 다시 읽는다.
+  // (각 탭이 처음 읽은 목록을 그대로 저장하면, 다른 탭에서 남긴 것을 덮어써서 지우게 된다)
+  function resyncStore() {
+    const before = JSON.stringify([saved, watched]);
     saved = store.get(KEY.saved, []);
+    watched = store.get(KEY.watched, []);
+    const b = store.get(KEY.block, null) || {};
+    blocks.works = Array.isArray(b.works) ? b.works : [];
+    blocks.artists = Array.isArray(b.artists) ? b.artists : [];
+    Object.assign(settings, store.get(KEY.settings, {}));
     refreshViewed();
-  });
+    applyBlocks();
+    mergeDuplicates();
+    if (window.__hkResyncUI && JSON.stringify([saved, watched]) !== before) window.__hkResyncUI();
+  }
+  window.addEventListener('pageshow', e => { if (e.persisted) resyncStore(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) resyncStore(); });
+  window.addEventListener('focus', resyncStore);
 
   const TAXO_RE = /^\/(tag|artist|group|series|character)\/(.+)-[a-z]+\.html/i;
 
@@ -2415,13 +2399,19 @@
     return !!(im && im.complete && im.naturalWidth);
   }
 
+  let readerPreOn = false;
   function initReaderPreload() {
-    if (!settings.preload) return;
+    if (!settings.preload || readerPreOn) return;
     const gid = getCurrentId();
     if (!gid) return;
+    readerPreOn = true;
 
     function tick(files) {
-      if (!settings.preload) return;
+      if (!settings.preload) {
+        preBusy.forEach(c => { try { c.abort(); } catch (e) {} });
+        preBusy.clear();
+        return;
+      }
       const cur = fxPage() - 1;
       const ok = i => i >= 0 && i < files.length
         && !preDone.has(i) && !preBusy.has(i)
@@ -2438,6 +2428,12 @@
         }
         if (next >= 0) preloadPage(gid, files, next);
       }
+      preBusy.forEach((c, i) => {
+        if (i < cur - PRE_KEEP_BEHIND || i > cur + PRE_KEEP_AHEAD) {
+          try { c.abort(); } catch (e) {}
+          preBusy.delete(i);
+        }
+      });
       preBlob.forEach((u, i) => {
         if (i < cur - PRE_KEEP_BEHIND || i > cur + PRE_KEEP_AHEAD) {
           URL.revokeObjectURL(u);
@@ -2646,6 +2642,32 @@
       }, { root: null, rootMargin: '150px 0px' })
     : null;
 
+  // 저장된 썸네일이 없을 때: 작품 정보에서 1페이지 주소를 받아 썸네일로 쓴다 (동시에 2개까지)
+  const thumbMiss = { q: [], active: 0, wait: new Map() };
+  function missThumb(id) {
+    id = String(id);
+    if (thumbMiss.wait.has(id)) return thumbMiss.wait.get(id);
+    const pr = new Promise(res => { thumbMiss.q.push({ id, res }); });
+    thumbMiss.wait.set(id, pr);
+    pumpMissThumb();
+    return pr;
+  }
+  function pumpMissThumb() {
+    while (thumbMiss.active < 2 && thumbMiss.q.length) {
+      const { id, res } = thumbMiss.q.shift();
+      thumbMiss.active++;
+      fetchGalleryFiles(id)
+        .then(arr => (arr && arr[0] ? readerImgUrl(id, arr[0]) : ''))
+        .catch(() => '')
+        .then(u => {
+          if (u) { setThumb(id, u); flushThumbs(); }
+          else thumbMiss.wait.delete(id);
+          res(u || '');
+        })
+        .then(() => { thumbMiss.active--; pumpMissThumb(); });
+    }
+  }
+
   function queueThumb(im, u) {
     if (!thumbIO) { im.src = u; return; }
     im.dataset.src = u;
@@ -2736,20 +2758,59 @@
         { duration: dur, easing: GROW });
       a.onfinish = a.oncancel = () => { e.style.overflow = ''; };
     }
+    // 바꾼 것을 되돌리는 방법을 모아 두었다가, 뒤로가기로 이 화면이 되살아나면 되돌린다
+    let morphUndo = [];
+    function undoMorph() {
+      const ops = morphUndo;
+      morphUndo = [];
+      ops.reverse().forEach(f => { try { f(); } catch (e) {} });
+      ['#filt', '#tl', '#bar'].forEach(sel => {
+        const e = $(sel);
+        if (e && e.getAnimations) e.getAnimations().forEach(a => a.cancel());
+      });
+    }
+    window.__hkMorphUndo = undoMorph;
+    window.addEventListener('pageshow', e => {
+      if (!e.persisted) return;
+      undoMorph();
+      try { sessionStorage.removeItem('hk_bar'); sessionStorage.removeItem('hk_zoom'); } catch (err) {}
+    });
+    function addedNode(n) { morphUndo.push(() => n.remove()); }
+    // 지우지 않고 폭 0 으로 접어 둔다 (되돌릴 때 그대로 펼친다)
     function collapseOut(e, dur) {
-      if (!e.animate) { e.remove(); return; }
       const full = boxOf(e);
+      const prev = { o: e.style.overflow, f: e.style.flexShrink, p: e.style.pointerEvents };
       e.style.overflow = 'hidden';
       e.style.flexShrink = '0';
-      const a = e.animate([Object.assign({ opacity: 1 }, full), Object.assign({ opacity: 0 }, ZERO_BOX)],
-        { duration: dur, easing: GROW, fill: 'forwards' });
-      a.onfinish = () => e.remove();
+      e.style.pointerEvents = 'none';
+      const a = e.animate ? e.animate([Object.assign({ opacity: 1 }, full), Object.assign({ opacity: 0 }, ZERO_BOX)],
+        { duration: dur, easing: GROW, fill: 'forwards' }) : null;
+      if (!a) e.style.display = 'none';
+      morphUndo.push(() => {
+        if (a) a.cancel();
+        e.style.display = '';
+        e.style.overflow = prev.o;
+        e.style.flexShrink = prev.f;
+        e.style.pointerEvents = prev.p;
+      });
     }
     function popPill(e, show, dur) {
-      if (!e.animate) { if (!show) e.remove(); return; }
       const kf = [{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'none' }];
-      const a = e.animate(show ? kf : kf.slice().reverse(), { duration: dur, easing: GROW, fill: show ? 'none' : 'forwards' });
-      if (!show) a.onfinish = () => e.remove();
+      if (show) {
+        if (e.animate) e.animate(kf, { duration: dur, easing: GROW });
+        return;
+      }
+      const prevP = e.style.pointerEvents;
+      e.style.pointerEvents = 'none';
+      const a = e.animate ? e.animate(kf.slice().reverse(), { duration: dur, easing: GROW, fill: 'forwards' }) : null;
+      if (!a) e.style.display = 'none';
+      morphUndo.push(() => { if (a) a.cancel(); e.style.display = ''; e.style.pointerEvents = prevP; });
+    }
+    function setText(n, t) {
+      if (!n || n.textContent === t) return;
+      const old = n.textContent;
+      n.textContent = t;
+      morphUndo.push(() => { n.textContent = old; });
     }
     function targetSpec(url) {
       let u;
@@ -2774,6 +2835,7 @@
       const t = targetSpec(url);
       if (!t) return false;
       const D = dur || 420;
+      undoMorph();
       root.classList.add('morph');
       if (panelMode) setPanel(null, true);
       if (metaOpen()) closeMeta(true);
@@ -2782,11 +2844,11 @@
       // 품번 · 별
       const cn = $('#curNum'), ps = $('#pstars');
       if (t.id) {
-        if (cn) cn.textContent = t.id;
+        if (cn) setText(cn, t.id);
         else if (bar) {
           const nodes = frag(curHtml(t.id));
           nodes.slice().reverse().forEach(n => bar.insertBefore(n, bar.firstChild));
-          nodes.forEach(n => expandIn(n, D));
+          nodes.forEach(n => { addedNode(n); expandIn(n, D); });
         }
       } else {
         [cn, ps].forEach(n => { if (n) collapseOut(n, D); });
@@ -2794,29 +2856,40 @@
       // 정렬 버튼
       const ft = $('#filt');
       if (t.sort) {
-        if (ft) { const fl = ft.querySelector('.fl'); if (fl) fl.textContent = SORT_KR[t.sort] || ''; }
+        if (ft) setText(ft.querySelector('.fl'), SORT_KR[t.sort] || '');
         else if (bottom && bar) {
           const n = frag(filtHtml(t.sort))[0];
           bottom.insertBefore(n, bar);
+          addedNode(n);
           expandIn(n, D);
         }
       } else if (ft) collapseOut(ft, D);
       // 위쪽 작은 알약 (페이지 번호 · 확대 복구 · 세부사항)
       const inner = tlInner(t.reader, t.work);
       const tl = $('#tl');
-      if (inner && !tl) {
+      const idsOf = n => Array.from(n.children).map(c => c.id).join(',');
+      const newTl = () => {
         const n = frag(`<div class="tl pill" id="tl">${inner}</div>`)[0];
         $('#wrap').insertBefore(n, bottom);
+        addedNode(n);
+        return n;
+      };
+      if (inner && !tl) {
+        const n = newTl();
         n.style.transformOrigin = '100% 100%';
         popPill(n, true, D);
       } else if (!inner && tl) {
         tl.style.transformOrigin = '100% 100%';
         popPill(tl, false, D);
-      } else if (inner && tl && tl.innerHTML !== inner) {
-        const h0 = tl.offsetWidth;
-        tl.innerHTML = inner;
-        const h1 = tl.offsetWidth;
-        if (tl.animate && h0 !== h1) tl.animate([{ width: h0 + 'px' }, { width: h1 + 'px' }], { duration: D, easing: GROW });
+      } else if (inner && tl && idsOf(tl) !== idsOf(frag(`<div>${inner}</div>`)[0])) {
+        // 들어 있는 버튼이 다를 때만 바꾼다. 원래 알약은 숨겨 두고(되돌릴 수 있게) 새 알약을 같은 자리에 둔다
+        const w0 = tl.offsetWidth;
+        tl.id = 'tl-old';
+        tl.style.display = 'none';
+        morphUndo.push(() => { tl.style.display = ''; tl.id = 'tl'; });
+        const n = newTl();
+        const w1 = n.offsetWidth;
+        if (n.animate && w0 !== w1) n.animate([{ width: w0 + 'px' }, { width: w1 + 'px' }], { duration: D, easing: GROW });
       }
       return true;
     };
@@ -2865,7 +2938,6 @@
     let sgSeq = 0;
     let bmId = null;
     let bmBack = null;
-    let confirmCb = null;
 
     function syncGlass() {
       if (!glass.classList.contains('on') || panel.getAnimations().length) return;
@@ -2917,13 +2989,6 @@
       b.addEventListener('click', fn);
       return b;
     }
-    function ico(txt, title, fn, cls) {
-      const b = el('button', 'ico' + (cls ? ' ' + cls : ''), txt);
-      b.type = 'button';
-      b.title = title;
-      b.addEventListener('click', fn);
-      return b;
-    }
     function chipLink(text, href, cls) {
       const a = document.createElement('a');
       a.className = 'chip' + (cls ? ' ' + cls : '');
@@ -2936,21 +3001,33 @@
     function thumbEl(id) {
       const box = el('div', 'tb');
       box.title = '클릭: 열기';
-      const showEmpty = () => { box.insertBefore(el('span', '', '이미지 없음'), box.firstChild); };
-      const u = thumbs[id];
-      if (u) {
+      let empty = null;
+      const showEmpty = () => {
+        if (empty) return;
+        empty = el('span', '', '이미지 없음');
+        box.insertBefore(empty, box.firstChild);
+      };
+      const put = (u, retry) => {
         const im = document.createElement('img');
         im.alt = '';
-        im.addEventListener('error', () => { im.remove(); showEmpty(); });
-        im.addEventListener('load', () => im.classList.add('ld'));
+        im.addEventListener('error', () => {
+          im.remove();
+          if (retry) { delete thumbs[String(id)]; fetchMiss(); } else showEmpty();
+        });
+        im.addEventListener('load', () => { im.classList.add('ld'); if (empty) { empty.remove(); empty = null; } });
         box.appendChild(im);
         queueThumb(im, u);
-      } else showEmpty();
-      box.addEventListener('click', () => goTo(id));
+      };
+      const fetchMiss = () => {
+        missThumb(id).then(u => { if (u && box.isConnected) put(u, false); else showEmpty(); });
+      };
+      const u = thumbs[id];
+      if (u) put(u, true);
+      else fetchMiss();
+      box.addEventListener('click', () => goTo(id, box));
       return box;
     }
 
-    const SWAP_OUT = 130;
     const SWAP_EASE = 'cubic-bezier(.22,1,.36,1)';
     let swapSeq = 0, swapT = 0;
 
@@ -2981,17 +3058,6 @@
     function growRender(fn) {
       const h0 = panel.offsetHeight;
       fn();
-      growFrom(h0);
-    }
-
-    // 글자 등장 효과 없이 내용만 바로 바꾸고, 팝업 크기만 부드럽게 맞춘다
-    function fadeSwap(outNodes, build) {
-      ++swapSeq;
-      clearTimeout(swapT);
-      const h0 = panel.offsetHeight;
-      panel.style.transition = '';
-      panel.style.height = '';
-      build();
       growFrom(h0);
     }
 
@@ -3397,16 +3463,6 @@
       }
     }
 
-    function iconBtn(icon, title, fn, cls) {
-      const b = el('button', 'ibs' + (cls ? ' ' + cls : ''));
-      b.type = 'button';
-      b.title = title;
-      b.setAttribute('aria-label', title);
-      b.innerHTML = icon;
-      b.addEventListener('click', fn);
-      return b;
-    }
-
     // 지운 일지를 되돌릴 수 있는 토스트
     function undoToast(item, idx) {
       toast('일지를 삭제했습니다', { label: '되돌리기', fn: () => {
@@ -3506,11 +3562,10 @@
         if (s.stars) dt.appendChild(starsEl(s.stars));
         dt.appendChild(el('div', 'dd', day));
         info.append(el('div', 'ttl', s.alias || s.title || dates[s.id] || ''), el('div', 'pid', s.id), dt);
-        info.addEventListener('click', () => goTo(s.id));
-
         const foot = el('div', 'foot');
         foot.append(info);
         const tb = thumbEl(s.id);
+        info.addEventListener('click', () => goTo(s.id, tb));
         row.append(tb, foot);
         // 꾹 누르면 카드 아래에 복사 · 수정 · 삭제
         longPress(row, () => [
@@ -3688,9 +3743,8 @@
           el('div', 'dt', new Date(w.ts).toLocaleString('ko-KR',
             { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))
         );
-        info.addEventListener('click', () => goTo(w.id));
-
         const tb = thumbEl(w.id);
+        info.addEventListener('click', () => goTo(w.id, tb));
         const foot = el('div', 'foot');
         foot.append(info);
         row.append(tb, foot);
@@ -3893,6 +3947,10 @@
           saveSettings();
           t.classList.toggle('on', !!settings[key]);
           if (key === 'blockOn') { applyBlocks(); mergeDuplicates(); }
+          if (key === 'preload' && settings.preload) {
+            if (IS_READER) initReaderPreload();
+            else warmPages();
+          }
         });
         grid.appendChild(t);
       });
@@ -3977,7 +4035,7 @@
         [HI.block, '꾹 누르기', '이 작품이나 작가를 차단해요.'],
         [HI.frame, '테두리 색', '흰색은 1페이지 준비 끝, 파란색은 이미 본 작품이에요.'],
         [HI.grid, '×N 뱃지', '제목이 같은 작품 묶음이에요. 눌러서 펼쳐요.'],
-        [ICON.sort, '정렬', '왼쪽 아래 버튼으로 최신 · 인기 순을 바꿔요.']
+        [ICON.sort, '정렬', '하단 알약 왼쪽의 버튼으로 최신 · 인기 순을 바꿔요.']
       ],
       reader: [
         [HI.tap, '이미지 누르기', '왼쪽은 다음, 오른쪽은 이전 페이지예요. 이미지 밖은 눌러도 그대로예요.'],
@@ -4161,31 +4219,6 @@
       }, 250);
     }
 
-    function askConfirm(msg, ok, cancel) {
-      confirmCb = { msg, ok, cancel };
-      setPanel('confirm');
-    }
-
-    function renderConfirm() {
-      panel.textContent = '';
-      const c = confirmCb || {};
-      panel.appendChild(el('div', 'val', c.msg || '계속할까요?'));
-      const row = el('div', 'row');
-      row.append(
-        btn('취소', 'sm', () => {
-          const f = c.cancel;
-          confirmCb = null;
-          if (f) f(); else setPanel(null, true);
-        }),
-        btn('확인', 'primary sm', () => {
-          const f = c.ok;
-          confirmCb = null;
-          if (f) f();
-        })
-      );
-      panel.appendChild(row);
-    }
-
     function renderHomeChoice() {
       panel.textContent = '';
       panel.appendChild(el('div', 'lbl', '어디로 갈까요?'));
@@ -4210,7 +4243,7 @@
 
     const btnFor = {
       search: '#searchBtn', hist: '#histBtn', set: '#setBtn',
-      info: '#infoBtn', sort: '#filt', bm: '#pstars', preview: '#pg', home: '#homeBtn', confirm: '#setBtn', help: '#setBtn', block: '#setBtn'
+      info: '#infoBtn', sort: '#filt', bm: '#pstars', preview: '#pg', home: '#homeBtn', help: '#setBtn', block: '#setBtn'
     };
     // ⋯ 상세정보: 팝업을 작품 카드 안에 붙여서, 스크롤해도 카드와 한 몸처럼 움직이게 한다
     let metaCard = null, meta = null;
@@ -4416,7 +4449,7 @@
     const RENDERERS = {
       search: renderSearch, hist: renderHist, set: renderSettings,
       info: renderInfo, sort: renderSort, bm: renderBm,
-      preview: renderPreview, home: renderHomeChoice, confirm: renderConfirm, help: renderHelp, block: renderBlockList
+      preview: renderPreview, home: renderHomeChoice, help: renderHelp, block: renderBlockList
     };
 
     function setPanel(mode, closeOnly) {
@@ -4462,7 +4495,7 @@
     function paintMode(mode) {
       panel.scrollTop = 0;
       RENDERERS[mode]();
-      panel.classList.toggle('mini', mode === 'home' || mode === 'confirm');
+      panel.classList.toggle('mini', mode === 'home');
       panel.classList.toggle('hist', mode === 'hist');
       syncKeyboard();
     }
@@ -4600,6 +4633,14 @@
     window.__hkEdges = updateEdges;
     updateEdges();
     updateCounts();
+
+    window.__hkResyncUI = () => {
+      updateCounts();
+      if (panelMode === 'hist' && !cmenu) {
+        if (histMode === 'saved') renderItems();
+        else renderHistItems();
+      }
+    };
   }
 
   let fxOv = null;
@@ -4763,6 +4804,7 @@
   function leaveTo(url) {
     const ok = morphUiTo(url, 320);
     setTimeout(() => { location.href = url; }, ok ? 300 : 0);
+    setTimeout(() => { if (window.__hkMorphUndo) window.__hkMorphUndo(); }, 4500);
   }
 
   function fxLeaveUI(url, dur) {
@@ -4810,6 +4852,7 @@
       fxBusy = false;
       if (z) z.remove();
       ov.classList.remove('on');
+      if (window.__hkMorphUndo) window.__hkMorphUndo();
       try { sessionStorage.removeItem('hk_zoom'); sessionStorage.removeItem('hk_blk'); } catch (e) {}
     }, 4500);
   }
@@ -4990,7 +5033,6 @@
   // 팝업과 같은 강성(260)에 감쇠만 높여(22 → 24) 넘친 뒤 되돌아오는 바운스를 줄였다
   const TURN_DUR = 600;
   const TURN_N = 36;
-  const TURN_DIST = 0.42;
   const TURN_FLIP = false;
   const DRAG_START = 8;
   const DRAG_CUT = 0.12;
@@ -5259,7 +5301,7 @@
       // 지금 페이지조차 아직 안 떠 있으면 덮개를 씌우지 않고 사이트가 바로 보여주게 둔다
       ++turnSeq;
       endChain();
-      location.hash = '#' + next;
+      location.replace('#' + next);
       hlog('넘김', cur, '→', next, '(현재 페이지 로딩 전 · 애니메이션 생략)');
       return;
     }
@@ -5271,7 +5313,7 @@
     const realBefore = findReaderImg();
     const attrBefore = realBefore ? realBefore.getAttribute('src') : null;
     markOwn(next);
-    location.hash = '#' + next;
+    location.replace('#' + next);
     pendingIn++;
     syncActive();
 
@@ -5426,7 +5468,7 @@
     drag.outL = null;
     drag.inL = null;
     markOwn(drag.next);
-    location.hash = '#' + drag.next;
+    location.replace('#' + drag.next);
     const pi = poseOf(il);
     if (ol) {
       const po = poseOf(ol);
