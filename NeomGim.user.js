@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.14.2
+// @version      1.15.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.14.2';
+  const VERSION = '1.15.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -2452,7 +2452,7 @@
         hlog('리더 미리 받기 시작 · 총', files.length, '장');
         tick(files);
         window.addEventListener('hashchange', () => tick(files));
-        setInterval(() => tick(files), 500);
+        setInterval(() => { tick(files); if (!isQuiet()) prepAround(); }, 500);
       } else if (waited > 15000) {
         clearInterval(wait);
         hlog('리더 미리 받기 실패: galleryinfo 를 찾지 못함');
@@ -5135,7 +5135,48 @@
     return turnWrap;
   }
 
+  // ----- 다음 · 이전 페이지 준비: 화면 크기 그대로 투명하게 깔아 두고 해독까지 미리 끝낸다 -----
+  // (미리 받기만 하고 해독은 안 된 이미지는 움직이는 도중에 뒤늦게 나타난다)
+  const prep = new Map();
+  function dropPrep(idx) {
+    const p = prep.get(idx);
+    if (!p) return;
+    prep.delete(idx);
+    if (p.layer !== curLayer && !leaving.has(p.layer) && p.layer !== holdLayer) { try { p.layer.remove(); } catch (e) {} }
+  }
+  function prepLayer(idx) {
+    if (prep.has(idx)) return;
+    const im = pageReady(idx);
+    if (!im) return;
+    const l = fitLayer(im.src, im.naturalWidth, im.naturalHeight);
+    l.style.opacity = '0';
+    l.style.transform = 'translate3d(0,0,0)';
+    ensureWrap().appendChild(l);
+    const img = l.firstChild;
+    const p = { layer: l, src: im.src, done: false, ready: null };
+    p.ready = (img.decode ? img.decode() : Promise.resolve()).catch(() => {}).then(() => { p.done = true; });
+    prep.set(idx, p);
+  }
+  // 지금 페이지 기준 바로 다음 · 이전 장만 준비해 두고 나머지는 치운다
+  function prepAround() {
+    if (!settings.preload || drag.mode === 2 || zoom > 1.01) return;
+    const cur = fxPage() - 1;
+    const want = [cur + 1, cur - 1];
+    Array.from(prep.keys()).forEach(i => { if (want.indexOf(i) < 0) dropPrep(i); });
+    want.forEach(i => { if (i >= 0) prepLayer(i); });
+  }
+  // 준비해 둔 장면을 꺼낸다 (해독이 끝날 때까지 기다리는 약속도 함께)
+  function takePrep(idx, src) {
+    const p = prep.get(idx);
+    if (!p) return null;
+    prep.delete(idx);
+    if (p.src !== src || !p.layer.isConnected) { try { p.layer.remove(); } catch (e) {} return null; }
+    p.layer.getAnimations().forEach(a => a.cancel());
+    return p;
+  }
+
   function endChain() {
+    prep.forEach((p, i) => dropPrep(i));
     holdLayer = null;
     clearTimeout(spinT);
     if (turnWrap) { try { turnWrap.remove(); } catch (e) {} }
@@ -5350,22 +5391,40 @@
       if (my !== turnSeq) return;
       hideSpin();
       if (holdLayer === out) holdLayer = null;
-      const inL = fitLayer(info.src, info.nw, info.nh);
-      const inImg = inL.firstChild;
+      const pp = takePrep(next - 1, info.src);
+      let inL, wait;
+      if (pp) {
+        inL = pp.layer;
+        wait = pp.done ? null : pp.ready;
+      } else {
+        // 준비된 장면이 없으면 투명하게 먼저 깔고(화면 크기 그대로) 해독을 기다린다
+        inL = fitLayer(info.src, info.nw, info.nh);
+        inL.style.opacity = '0';
+        ensureWrap().appendChild(inL);
+        const im = inL.firstChild;
+        wait = im.decode ? im.decode().catch(() => {}) : null;
+      }
       const go = () => {
-        if (my !== turnSeq) { try { inL.remove(); } catch (e) {} return; }
+        if (my !== turnSeq) { if (inL !== curLayer) { try { inL.remove(); } catch (e) {} } return; }
         let ox = 0;
         if (out && out.isConnected) { ox = poseOf(out).x; leave(out, side, W); }
-        ensureWrap().appendChild(inL);
+        if (!inL.isConnected) ensureWrap().appendChild(inL);
         shown = info;
         slide(inL, ox - side * W, 0, inScale(dir), 1, 0, 1);
         curLayer = inL;
+        setTimeout(prepAround, TURN_DUR + 60);
       };
-      if (inL._fresh && inImg.decode) {
+      if (wait) {
+        if (out && out.isConnected && !holdLayer) holdLayer = out;
         let done = false;
-        const once = () => { if (!done) { done = true; go(); } };
-        inImg.decode().then(once, once);
-        setTimeout(once, 120);
+        const once = () => {
+          if (done) return;
+          done = true;
+          if (holdLayer === out) holdLayer = null;
+          go();
+        };
+        wait.then(once, once);
+        setTimeout(once, 300);
       } else go();
     }).catch(() => {
       pendingIn--;
@@ -5392,10 +5451,11 @@
     const im = pageReady(drag.next - 1);
     if (!im) return;
     drag.info = { src: im.src, nw: im.naturalWidth, nh: im.naturalHeight };
-    drag.inL = fitLayer(drag.info.src, drag.info.nw, drag.info.nh);
+    const pp = takePrep(drag.next - 1, drag.info.src);
+    drag.inL = pp ? pp.layer : fitLayer(drag.info.src, drag.info.nw, drag.info.nh);
     setPx(0);
     coverUp();
-    ensureWrap().appendChild(drag.inL);
+    if (!drag.inL.isConnected) ensureWrap().appendChild(drag.inL);
   }
 
   function dragBegin(dir) {
@@ -5493,6 +5553,7 @@
     slide(il, pi.x, 0, pi.s, 1, pi.o, 1);
     shown = drag.info;
     curLayer = il;
+    setTimeout(prepAround, TURN_DUR + 60);
     press(0, 10);
   }
 
