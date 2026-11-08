@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.18.0
+// @version      1.18.1
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.18.0';
+  const VERSION = '1.18.1';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -395,8 +395,8 @@
     hk-dim {
       position: fixed !important; top: 0 !important; right: 0 !important; bottom: 0 !important; left: 0 !important; z-index: 2147483000 !important; display: block !important;
       background: rgba(10, 10, 14, 0.28);
-      -webkit-backdrop-filter: blur(9px) saturate(1.1); backdrop-filter: blur(9px) saturate(1.1);
-      opacity: 0; transition: opacity .25s ease;
+      -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
+      opacity: 0; transition: opacity .28s ease; will-change: opacity;
     }
     hk-dim.on { opacity: 1; }
     .gallery-content > div.hk-metaon:active { transform: none !important; }
@@ -722,7 +722,7 @@
     .root.leave .wrap { opacity: 0; transform: translateY(10px); transition: opacity .28s ease, transform .28s ease; }
     .root.enter .wrap { animation: hkWrapIn .5s var(--ease) .12s backwards; }
     .root.morph .bar, .root.morph .filt, .root.morph .tl { animation: none; }
-    .wrap > .tl, .bottom { transition: filter .25s ease, opacity .25s ease; }
+    .wrap > .tl, .bottom { transition: opacity .25s ease; }
     .root.dim .wrap > .tl, .root.dim .bottom { filter: blur(5px); opacity: .6; }
     .root.dim .wrap > .tl, .root.dim .wrap > .tl *, .root.dim .bottom, .root.dim .bottom * { pointer-events: none !important; }
     @keyframes hkWrapIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
@@ -3759,16 +3759,17 @@
       const pr = panel.getBoundingClientRect();
       const topLimit = (hd ? hd.getBoundingClientRect().bottom : pr.top) + 4;
       const botLimit = (ft ? ft.getBoundingClientRect().top : pr.bottom) - 6;
-      let rr = row.getBoundingClientRect();
+      let rr = layoutRect(row);
       // 아래에 자리가 모자라면 먼저 목록을 올려 본다
-      if (rr.bottom + 6 + mh > botLimit && body) {
-        const need = rr.bottom + 6 + mh - botLimit;
+      const GAP = 14;
+      if (rr.bottom + GAP + mh > botLimit && body) {
+        const need = rr.bottom + GAP + mh - botLimit;
         const room = body.scrollHeight - body.clientHeight - body.scrollTop;
-        if (room > 0) { body.scrollTop += Math.min(need, room); rr = row.getBoundingClientRect(); }
+        if (room > 0) { body.scrollTop += Math.min(need, room); rr = layoutRect(row); }
       }
       let y, below = true;
-      if (rr.bottom + 6 + mh <= botLimit) y = rr.bottom + 6;
-      else if (rr.top - 6 - mh >= topLimit) { y = rr.top - 6 - mh; below = false; }
+      if (rr.bottom + GAP + mh <= botLimit) y = rr.bottom + GAP;
+      else if (rr.top - GAP - mh >= topLimit) { y = rr.top - GAP - mh; below = false; }
       else { y = Math.max(topLimit, Math.min(botLimit - mh, rr.bottom - mh - 8)); below = false; }
       let x = rr.left + rr.width / 2 - mw / 2;
       x = Math.max(pr.left + 8, Math.min(pr.right - 8 - mw, x));
@@ -3788,6 +3789,7 @@
       row.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         if (e.target.closest && e.target.closest('.cmenu')) return;
+        if (row.classList.contains('menu-on')) return;
         x0 = e.clientX;
         y0 = e.clientY;
         clearTimeout(t);
@@ -3812,7 +3814,10 @@
     panel.addEventListener('click', e => {
       if (lpJust) { lpJust = false; e.preventDefault(); e.stopPropagation(); return; }
       if (!cmenu) return;
-      if (e.composedPath().includes(cmenu.el)) return;
+      const cp = e.composedPath();
+      if (cp.includes(cmenu.el)) return;
+      // 메뉴를 띄운 그 카드를 누르면 메뉴를 그대로 둔다
+      if (cp.includes(cmenu.row)) { e.preventDefault(); e.stopPropagation(); return; }
       e.preventDefault();
       e.stopPropagation();
       closeCardMenu();
@@ -4381,12 +4386,15 @@
       const gc = card.parentElement;
       if (!gc) return;
       if (!dimEl) dimEl = document.createElement('hk-dim');
-      dimEl.classList.remove('hk-stray');
-      gc.appendChild(dimEl);
-      void dimEl.offsetWidth;
-      dimEl.classList.add('on');
+      dimEl.classList.remove('hk-stray', 'on');
       card.classList.add('hk-lpfocus');
-      root.classList.add('dim');
+      gc.appendChild(dimEl);
+      // 흐림은 다음 프레임에 켜서, 카드가 튀어 오르는 첫 프레임과 겹치지 않게 한다
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!(meta && meta.card === card)) return;
+        dimEl.classList.add('on');
+        root.classList.add('dim');
+      }));
     }
     function dimOff(card) {
       root.classList.remove('dim');
@@ -4413,7 +4421,7 @@
 
     // 여는 순간 한 번만 자리를 정한다 (아래 공간이 모자라면 위로). 그 뒤로는 카드와 같이 스크롤된다
     function placeMeta(m) {
-      const r = m.card.getBoundingClientRect();
+      const r = layoutRect(m.card);
       const vw = window.innerWidth, vh = window.innerHeight;
       const w = Math.min(Math.max(r.width + 40, 280), vw - 24);
       m.pop.style.width = w + 'px';
@@ -4464,6 +4472,12 @@
       if (!meta) return;
       const path = e.composedPath();
       if (path.includes(meta.pop)) return;
+      // 꾹 눌러 띄운 팝업이면, 그 카드를 눌러도 아무 일 없이 그대로 둔다
+      if (meta.kind === 'block' && path.includes(meta.card)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
       if (path.some(n => n && n.classList && (n.classList.contains('dots') ||
         (n.classList.contains('info') && n.getRootNode && n.getRootNode().host && n.getRootNode().host.classList.contains('hk-card-host'))))) return;
       if (path.includes(host)) { closeMeta(); return; }
@@ -5006,11 +5020,26 @@
   }
 
   // 홈 카드 꾹 누르기 → 카드 아래에 차단 팝업
+  // 눌림 · 튀어 오름 같은 크기 변화를 뺀, 원래 크기의 자리 (팝업 위치를 정할 때 쓴다)
+  function layoutRect(el) {
+    const r = el.getBoundingClientRect();
+    let k = 1;
+    try {
+      const t = getComputedStyle(el).transform;
+      if (t && t !== 'none') k = new DOMMatrixReadOnly(t).a || 1;
+    } catch (e) {}
+    if (Math.abs(k - 1) < 0.001) return r;
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, w = r.width / k, h = r.height / k;
+    return { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2, width: w, height: h };
+  }
+
   // 누르고 있는 동안 카드가 점점 눌리고, 손을 떼면 돌아오고, 꾹 누르기가 되면 톡 튀어 오른다
   function pressFx(el) {
     const none = { release() {}, pop() {} };
     if (!el || !el.animate) return none;
     el.getAnimations().forEach(a => { if (a.id === 'hk-press') a.cancel(); });
+    el.style.willChange = 'transform';
+    const unpromote = () => { if (!el.getAnimations().some(x => x.id === 'hk-press' && x.playState === 'running')) el.style.willChange = ''; };
     const a = el.animate([
       { transform: 'scale(1)' },
       { transform: 'scale(.965)', offset: .25 },
@@ -5024,8 +5053,8 @@
         done = true;
         try {
           a.updatePlaybackRate(-2.5);
-          a.onfinish = () => a.cancel();
-        } catch (e) { a.cancel(); }
+          a.onfinish = () => { a.cancel(); unpromote(); };
+        } catch (e) { a.cancel(); unpromote(); }
       },
       pop() {
         if (done) return;
@@ -5036,6 +5065,7 @@
           { transform: `scale(${k})` }, { transform: 'scale(1.03)', offset: .55 }, { transform: 'scale(1)' }
         ], { duration: 340, easing: 'ease-out' });
         b.id = 'hk-press';
+        b.onfinish = () => setTimeout(unpromote, 200);
       }
     };
   }
@@ -5050,6 +5080,7 @@
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const hostEl = cardHostIn(e.composedPath());
     if (!hostEl || !hostEl._hkInfo) return;
+    if (hostEl.parentElement && hostEl.parentElement.classList.contains('hk-lpfocus')) return;
     homeLp.x = e.clientX;
     homeLp.y = e.clientY;
     homeRelease();
@@ -5059,7 +5090,7 @@
       homeLp.just = true;
       if (homeLp.fx) { homeLp.fx.pop(); homeLp.fx = null; }
       try { if (navigator.vibrate) navigator.vibrate(10); } catch (err) {}
-      if (openCardMeta) openCardMeta(hostEl._hkInfo, hostEl, 'block');
+      requestAnimationFrame(() => { if (openCardMeta) openCardMeta(hostEl._hkInfo, hostEl, 'block'); });
     }, 450);
   }, true);
   document.addEventListener('pointermove', e => {
