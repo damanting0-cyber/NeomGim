@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="안드로이드 파이어폭스에서 NeomGim 유저스크립트를 설치하는 방법">
+<title>NeomGim 설치 안내</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+  /* 레이아웃: 휴대폰 한 손 읽기용 한 줄 기둥. 단계는 실제 순서라 번호를 쓴다 */
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --ink: #1b1c20;
+    --sub: #5d5f68;
+    --line: #e2e0d8;
+    --accent: #a86b00;
+    --accent-soft: #fbf1dc;
+    --chip: #24252b;
+    --chip-ink: #f3f3f5;
+    --ok: #2f7a4a;
+    --warn: #a2441f;
+    --font-body: 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121317; --surface: #1b1c22; --ink: #ececf0; --sub: #a3a5ae; --line: #2c2d35;
+      --accent: #ffd54a; --accent-soft: #2b2617; --chip: #2e2f37; --chip-ink: #f3f3f5;
+      --ok: #7fd39b; --warn: #f0a07c; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121317; --surface: #1b1c22; --ink: #ececf0; --sub: #a3a5ae; --line: #2c2d35;
+    --accent: #ffd54a; --accent-soft: #2b2617; --chip: #2e2f37; --chip-ink: #f3f3f5;
+    --ok: #7fd39b; --warn: #f0a07c; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font-body); font-size: 16px; line-height: 1.7;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 56px;
+    -webkit-text-size-adjust: 100%;
+  }
+  main { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+  h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.3; }
+  p { margin: 0; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+  header { display: flex; flex-direction: column; gap: 14px; }
+  .eyebrow { font-size: 12.5px; font-weight: 600; letter-spacing: .08em; color: var(--sub); }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+  .lead { color: var(--sub); font-size: 16.5px; }
+  .need { display: flex; flex-wrap: wrap; gap: 8px; }
+  .need span {
+    font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  }
+
+  .section { display: flex; flex-direction: column; gap: 16px; }
+  .section > h2 { font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
+  .section > .note { color: var(--sub); font-size: 15px; }
+
+  ol.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; counter-reset: s; }
+  ol.steps > li {
+    counter-increment: s; position: relative;
+    display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px;
+    padding-bottom: 26px;
+  }
+  ol.steps > li::before {
+    content: counter(s); grid-row: 1 / span 2;
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--ink); color: var(--bg); font-weight: 700; font-size: 15px;
+    font-variant-numeric: tabular-nums;
+  }
+  ol.steps > li:not(:last-child)::after {
+    content: ''; position: absolute; left: 16.5px; top: 40px; bottom: 6px; width: 1px; background: var(--line);
+  }
+  .step-body { min-width: 0; display: flex; flex-direction: column; gap: 10px; padding-top: 3px; }
+  .step-body h3 { font-size: 17.5px; font-weight: 700; }
+  .step-body p { color: var(--ink); }
+  .step-body .sub { color: var(--sub); font-size: 14.5px; }
+
+  /* 화면에 보이는 버튼 이름 */
+  .ui {
+    display: inline-block; font-size: .88em; font-weight: 600; line-height: 1.5;
+    padding: 0 8px; border-radius: 6px; background: var(--chip); color: var(--chip-ink);
+    white-space: nowrap;
+  }
+
+  .linkbox {
+    display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 14px;
+    border-radius: 14px; background: var(--surface); border: 1px solid var(--line);
+  }
+  .linkbox a, .linkbox code {
+    flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: 13px; line-height: 1.5;
+    overflow-wrap: anywhere; word-break: break-all;
+  }
+  .copy {
+    flex: none; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    padding: 7px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink);
+  }
+  .copy:active { transform: scale(.96); }
+
+  .callout {
+    padding: 14px 16px; border-radius: 14px; background: var(--accent-soft);
+    font-size: 15px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .callout strong { font-weight: 700; }
+
+  .uses { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 460px) { .uses { grid-template-columns: minmax(0, 1fr); } }
+  .use { padding: 14px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+  .use h3 { font-size: 15.5px; font-weight: 700; margin-bottom: 4px; }
+  .use p { color: var(--sub); font-size: 14.5px; line-height: 1.6; }
+
+  details {
+    border-top: 1px solid var(--line); padding: 14px 0;
+  }
+  details:last-of-type { border-bottom: 1px solid var(--line); }
+  summary {
+    cursor: pointer; font-weight: 600; font-size: 16px; list-style: none;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: '+'; font-weight: 500; color: var(--sub); font-size: 20px; line-height: 1; }
+  details[open] summary::after { content: '−'; }
+  details .ans { margin-top: 10px; color: var(--sub); font-size: 15px; display: flex; flex-direction: column; gap: 8px; }
+
+  footer { color: var(--sub); font-size: 13px; text-align: left; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">안드로이드 · 파이어폭스</div>
+    <h1>NeomGim 설치하기</h1>
+    <p class="lead">NeomGim은 hitomi.la를 휴대폰에서 편하게 보게 해 주는 작은 프로그램이에요. 유저스크립트를 처음 들어 봐도 아래 순서대로 누르기만 하면 5분이면 끝나요.</p>
+    <div class="need"><span>안드로이드 휴대폰</span><span>파이어폭스 앱</span><span>인터넷 연결</span></div>
+  </header>
+
+  <section class="section">
+    <h2>먼저 알아 두기</h2>
+    <div class="callout">
+      <p><strong>유저스크립트</strong>는 특정 사이트에 들어갔을 때 그 화면을 바꿔 주는 작은 코드예요.</p>
+      <p><strong>Tampermonkey</strong>는 그 유저스크립트를 설치하고 실행해 주는 파이어폭스 부가 기능이에요. 그래서 Tampermonkey를 먼저 깔고, 그다음 NeomGim을 깔아요.</p>
+    </div>
+    <p class="note">크롬이나 삼성 인터넷은 이 방법으로 안 돼요. 안드로이드에서는 파이어폭스가 부가 기능을 제대로 지원해서 파이어폭스를 써요.</p>
+  </section>
+
+  <section class="section" aria-labelledby="install">
+    <h2 id="install">설치 순서</h2>
+    <ol class="steps">
+      <li>
+        <div class="step-body">
+          <h3>파이어폭스 설치</h3>
+          <p>Play 스토어에서 <span class="ui">Firefox</span>를 검색해서 설치하세요. 모질라(Mozilla)가 만든 주황색 여우 아이콘이에요.</p>
+          <p class="sub">이미 있다면 Play 스토어에서 최신 버전으로 업데이트만 해 두세요.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>Tampermonkey 설치</h3>
+          <p>파이어폭스에서 아래 주소를 열고 <span class="ui">Firefox에 추가</span>를 누르세요.</p>
+          <div class="linkbox">
+            <a href="https://addons.mozilla.org/ko/firefox/addon/tampermonkey/" target="_blank" rel="noopener">https://addons.mozilla.org/ko/firefox/addon/tampermonkey/</a>
+            <button class="copy" type="button" data-copy="https://addons.mozilla.org/ko/firefox/addon/tampermonkey/">복사</button>
+          </div>
+          <p>권한을 묻는 창이 뜨면 <span class="ui">추가</span>를 누르세요. 비공개 탭에서도 쓸지 묻는 칸이 있으면, 비공개 탭에서도 볼 생각이면 체크하세요.</p>
+          <p class="sub">주소가 안 열리면 파이어폭스 오른쪽 위(또는 아래) <span class="ui">⋮</span> 메뉴 → <span class="ui">부가 기능</span>에서 Tampermonkey를 검색해도 돼요.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>NeomGim 설치</h3>
+          <p>파이어폭스에서 아래 주소를 여세요. Tampermonkey 설치 화면이 자동으로 뜨면 <span class="ui">설치</span>를 누르면 끝이에요.</p>
+          <div class="linkbox">
+            <a href="https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js" target="_blank" rel="noopener">https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js</a>
+            <button class="copy" type="button" data-copy="https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js">복사</button>
+          </div>
+          <p class="sub">설치 화면 대신 코드가 글자로 쭉 보이면, Tampermonkey가 아직 안 깔렸거나 꺼져 있는 거예요. 2단계를 다시 확인하세요.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-body">
+          <h3>hitomi.la 열기</h3>
+          <p>파이어폭스에서 <code>hitomi.la</code>에 들어가면 바로 바뀐 화면이 나와요. 오른쪽 아래에 검색 · 기록 · 설정 버튼과 <span class="ui">H</span> 버튼이 보이면 성공이에요.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="section" aria-labelledby="use">
+    <h2 id="use">처음 쓸 때 알면 좋은 것</h2>
+    <div class="uses">
+      <div class="use"><h3>작품 열기</h3><p>목록에서 이미지를 누르면 작품이 커지면서 1페이지가 열려요. 제목을 누르면 태그와 작가가 나와요.</p></div>
+      <div class="use"><h3>페이지 넘기기</h3><p>화면 왼쪽 절반을 누르면 다음, 오른쪽 절반은 이전이에요. 옆으로 밀어도 넘어가요.</p></div>
+      <div class="use"><h3>확대</h3><p>두 손가락으로 벌리면 커져요. 위쪽 ↺ 버튼을 누르면 원래 크기로 돌아와요.</p></div>
+      <div class="use"><h3>별점 · 일지</h3><p>작품 화면 하단의 별을 누르고 별명을 정해 저장하면 일지에 남아요.</p></div>
+      <div class="use"><h3>차단</h3><p>목록에서 작품을 꾹 누르면 그 작품이나 작가를 숨길 수 있어요.</p></div>
+      <div class="use"><h3>더 자세히</h3><p>설정(톱니바퀴) 안의 <span class="ui">?</span> 버튼에 기능 설명이 다 있어요.</p></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="update">
+    <h2 id="update">업데이트</h2>
+    <p>따로 할 일은 없어요. 새 버전이 나오면 Tampermonkey가 하루에 한 번쯤 확인해서 알아서 바꿔 줘요.</p>
+    <p class="note">바로 받고 싶으면 3단계 주소를 다시 열고 <span class="ui">업데이트</span>를 누르세요. 저장해 둔 일지와 기록은 그대로 남아요.</p>
+  </section>
+
+  <section class="section" aria-labelledby="faq">
+    <h2 id="faq">안 될 때</h2>
+    <div>
+      <details>
+        <summary>hitomi.la에 들어가도 화면이 그대로예요</summary>
+        <div class="ans">
+          <p>⋮ 메뉴 → <span class="ui">부가 기능</span> → Tampermonkey가 켜져 있는지 확인하세요.</p>
+          <p>Tampermonkey를 열어 NeomGim이 켜져 있는지(스위치가 초록색인지)도 확인하세요.</p>
+          <p>비공개 탭이라면 Tampermonkey 설정에서 <span class="ui">비공개 브라우징에서 실행</span>을 켜야 해요.</p>
+        </div>
+      </details>
+      <details>
+        <summary>설치 주소를 열었는데 코드만 보여요</summary>
+        <div class="ans">
+          <p>Tampermonkey가 설치되지 않았거나 꺼져 있어요. 2단계를 다시 하고 3단계 주소를 다시 여세요.</p>
+        </div>
+      </details>
+      <details>
+        <summary>“유효하지 않은 유저스크립트”라고 떠요</summary>
+        <div class="ans">
+          <p>주소를 잘못 열었거나 새 버전이 막 올라와서 반영 중일 때 생겨요. 3단계 주소를 그대로 복사해서 몇 분 뒤 다시 열어 보세요.</p>
+        </div>
+      </details>
+      <details>
+        <summary>새로고침할 때 원래 사이트 화면이 잠깐 보여요</summary>
+        <div class="ans">
+          <p>Tampermonkey 대시보드 → <span class="ui">설정</span> → 맨 위 설정 모드를 <span class="ui">고급</span>으로 바꾼 뒤, <span class="ui">주입 모드</span>를 <span class="ui">즉시</span>로 바꾸면 줄어들어요.</p>
+        </div>
+      </details>
+      <details>
+        <summary>잠깐 끄고 원래 사이트로 보고 싶어요</summary>
+        <div class="ans">
+          <p>Tampermonkey 메뉴에서 <span class="ui">NeomGim 끄기</span>를 누르세요. 다시 켤 때는 같은 자리에서 <span class="ui">NeomGim 켜기</span>를 누르면 돼요.</p>
+        </div>
+      </details>
+      <details>
+        <summary>지우고 싶어요</summary>
+        <div class="ans">
+          <p>Tampermonkey를 열어 NeomGim 옆 휴지통 아이콘을 누르면 지워져요. Tampermonkey까지 지우려면 ⋮ 메뉴 → <span class="ui">부가 기능</span>에서 제거하세요.</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <footer>메뉴 이름은 파이어폭스 · Tampermonkey 버전에 따라 조금 다를 수 있어요.</footer>
+</main>
+
+<script>
+  document.querySelectorAll('.copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var text = b.getAttribute('data-copy');
+      var done = function () { b.textContent = '복사됨'; setTimeout(function () { b.textContent = '복사'; }, 1600); };
+      var fallback = function () {
+        var a = b.parentElement.querySelector('a, code');
+        var r = document.createRange(); r.selectNodeContents(a);
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        b.textContent = '길게 눌러 복사';
+      };
+      try {
+        navigator.clipboard.writeText(text).then(done, fallback);
+      } catch (e) { fallback(); }
+    });
+  });
+</script>
+
+</body>
+</html>
