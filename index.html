@@ -63,13 +63,15 @@
     border: 1px solid var(--line); background: var(--surface); color: var(--ink);
   }
 
-  .shot { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) clamp(118px, 34%, 210px); gap: 18px; align-items: center; }
+  .shot { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
   .shot img {
-    display: block; width: min(260px, 72%); max-width: 100%; height: auto;
-    border-radius: 22px; border: 2px solid var(--chip);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+    display: block; width: 100%; max-width: 100%; height: auto;
+    border-radius: 18px; border: 2px solid var(--chip);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
   }
-  .shot figcaption { color: var(--sub); font-size: 13.5px; text-align: center; }
+  .shot figcaption { color: var(--sub); font-size: 12px; line-height: 1.45; text-align: center; }
+  @media (max-width: 380px) { .hero h1 { font-size: 26px; } .hero .lead { font-size: 15px; } }
   .section { display: flex; flex-direction: column; gap: 16px; }
   .section > h2 { font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
   .section > .note { color: var(--sub); font-size: 15px; }
@@ -150,17 +152,19 @@
 </head>
 <body>
 <main>
-  <header>
-    <div class="eyebrow">안드로이드 · 파이어폭스</div>
-    <h1>NeomGim 설치하기</h1>
-    <p class="lead">NeomGim은 hitomi.la를 휴대폰에서 편하게 보게 해 주는 작은 프로그램이에요. 유저스크립트를 처음 들어 봐도 아래 순서대로 누르기만 하면 5분이면 끝나요.</p>
-    <div class="need"><span>안드로이드 휴대폰</span><span>파이어폭스 앱</span><span>인터넷 연결</span></div>
-  </header>
+  <div class="hero">
+    <header>
+      <div class="eyebrow">안드로이드 · 파이어폭스</div>
+      <h1>NeomGim 설치하기</h1>
+      <p class="lead">NeomGim은 hitomi.la를 휴대폰에서 편하게 보게 해 주는 작은 프로그램이에요. 유저스크립트를 처음 들어 봐도 아래 순서대로 누르기만 하면 5분이면 끝나요.</p>
+      <div class="need"><span>안드로이드 휴대폰</span><span>파이어폭스 앱</span><span>인터넷 연결</span></div>
+    </header>
+    <figure class="shot">
+      <img src="shot.jpg" width="520" height="1081" alt="NeomGim을 설치한 파이어폭스 화면. 아래쪽에 품번, 별 5개, 검색·기록·설정 버튼과 H 버튼이 떠 있다.">
+      <figcaption>실제 화면. 아래쪽 버튼들이 NeomGim이에요.</figcaption>
+    </figure>
+  </div>
 
-  <figure class="shot">
-    <img src="shot.jpg" width="520" height="1088" alt="NeomGim을 설치한 파이어폭스 화면. 아래쪽에 품번, 별 5개, 검색·기록·설정 버튼과 H 버튼이 떠 있다.">
-    <figcaption>실제 휴대폰 화면. 아래쪽에 떠 있는 버튼들이 NeomGim이에요.</figcaption>
-  </figure>
 
   <section class="section">
     <h2>먼저 알아 두기</h2>
