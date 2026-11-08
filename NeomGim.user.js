@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.17.1
+// @version      1.18.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.17.1';
+  const VERSION = '1.18.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -391,6 +391,14 @@
     .gallery-content > .hk-stray { display: none !important; }
     .hk-vanish { display: none !important; }
     .gallery-content > div.hk-metaon { z-index: 30 !important; }
+    .gallery-content > div.hk-lpfocus { z-index: 2147483001 !important; }
+    hk-dim {
+      position: fixed !important; top: 0 !important; right: 0 !important; bottom: 0 !important; left: 0 !important; z-index: 2147483000 !important; display: block !important;
+      background: rgba(10, 10, 14, 0.28);
+      -webkit-backdrop-filter: blur(9px) saturate(1.1); backdrop-filter: blur(9px) saturate(1.1);
+      opacity: 0; transition: opacity .25s ease;
+    }
+    hk-dim.on { opacity: 1; }
     .gallery-content > div.hk-metaon:active { transform: none !important; }
     ${settings.infinite ? 'html:not(.hk-pager-on) .page-container { display: none !important; }' : ''}
     .gallery-content .hk-hide { display: none !important; }
@@ -714,6 +722,9 @@
     .root.leave .wrap { opacity: 0; transform: translateY(10px); transition: opacity .28s ease, transform .28s ease; }
     .root.enter .wrap { animation: hkWrapIn .5s var(--ease) .12s backwards; }
     .root.morph .bar, .root.morph .filt, .root.morph .tl { animation: none; }
+    .wrap > .tl, .bottom { transition: filter .25s ease, opacity .25s ease; }
+    .root.dim .wrap > .tl, .root.dim .bottom { filter: blur(5px); opacity: .6; }
+    .root.dim .wrap > .tl, .root.dim .wrap > .tl *, .root.dim .bottom, .root.dim .bottom * { pointer-events: none !important; }
     @keyframes hkWrapIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
     .glass {
       position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 1;
@@ -968,9 +979,13 @@
     .item:active { background: rgba(255, 255, 255, 0.14); transition-duration: .12s; }
     .item img { -webkit-touch-callout: none; -webkit-user-drag: none; }
     .item.menu-on { z-index: 6; background: rgba(255, 255, 255, 0.16); transform: none; }
+    .hhead, .jfoot, .list > *, .sdiv { transition: filter .25s ease, opacity .25s ease, background .3s var(--ease), transform .3s var(--ease); }
+    .panel.lpfocus .hhead, .panel.lpfocus .jfoot,
+    .panel.lpfocus .list > :not(.menu-on) { filter: blur(4px); opacity: .45; }
+    .panel.lpfocus .hhead *, .panel.lpfocus .jfoot * { pointer-events: none; }
     .info .pid { color: #fff; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .cmenu {
-      position: absolute; top: calc(100% + 6px); z-index: 7; display: flex; gap: 2px; padding: 4px;
+      position: absolute; top: calc(100% + 6px); z-index: 12; display: flex; gap: 2px; padding: 4px;
       border-radius: 16px; background: rgba(40, 40, 46, 0.9);
       border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
       -webkit-backdrop-filter: blur(18px) saturate(1.5); backdrop-filter: blur(18px) saturate(1.5);
@@ -1638,6 +1653,7 @@
     const box = (root && root.querySelectorAll) ? root : document;
     box.querySelectorAll('.gallery-content > *').forEach(el => {
       if (el.dataset.hkDone || el.classList.contains('hk-stray') || el.classList.contains('hk-hidden')) return;
+      if (el.tagName === 'HK-DIM') return;
       const links = el.querySelectorAll('a[href]');
       for (let i = 0; i < links.length; i++) {
         if (WORK_HREF_RE.test(links[i].getAttribute('href') || '')) return;
@@ -3192,7 +3208,10 @@
     });
     ['keyup', 'keypress'].forEach(ev => host.addEventListener(ev, e => e.stopPropagation()));
 
-    scrim.addEventListener('click', () => setPanel(null, true));
+    scrim.addEventListener('click', () => {
+      if (cmenu) { closeCardMenu(); return; }
+      setPanel(null, true);
+    });
     scrim.addEventListener('mousedown', e => e.preventDefault());
 
     function paintSgs(items, word, emptyMsg) {
@@ -3708,6 +3727,8 @@
       cmenu = null;
       if (!m) return;
       m.row.classList.remove('menu-on');
+      panel.classList.remove('lpfocus');
+      root.classList.remove('dim');
       if (instant || !m.el.animate) { m.el.remove(); return; }
       const a = m.el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-4px) scale(.9)' }],
         { duration: 150, easing: 'ease-in', fill: 'forwards' });
@@ -3725,37 +3746,38 @@
         m.appendChild(b);
       });
       row.classList.add('menu-on');
-      row.appendChild(m);
-      cmenu = { el: m, row, at: performance.now() };
-      // 카드 가운데 아래에 두되, 목록 밖으로 나가지 않게 좌우를 맞춘다
+      panel.classList.add('lpfocus');
+      root.classList.add('dim');
+      // 메뉴는 목록 밖(팝업 맨 위 층)에 띄운다. 목록 안에 두면 위아래 막대에 가려질 수 있다
       const body = row.closest('.hbody');
-      const rr = row.getBoundingClientRect();
-      const br = body ? body.getBoundingClientRect() : rr;
-      const w = m.offsetWidth;
-      let left = rr.width / 2 - w / 2;
-      left = Math.max(br.left + 4 - rr.left, Math.min(br.right - 4 - rr.left - w, left));
-      m.style.left = left + 'px';
-      m.style.transformOrigin = (rr.width / 2 - left) + 'px 0';
-      if (m.animate) m.animate([{ opacity: 0, transform: 'translateY(-6px) scale(.8)' }, { opacity: 1, transform: 'none' }],
-        { duration: 320, easing: SWAP_EASE });
-      // 아래가 가려지면 목록을 살짝 올려 보여 준다
-      // 더 내릴 수 없는 맨 아래 카드면(아래 막대에 가려짐) 메뉴를 카드 위쪽에 띄운다
-      if (body) {
-        const ft = panel.querySelector('.jfoot');
-        const limit = br.bottom - (ft ? ft.offsetHeight + 16 : 8);
-        const mb = m.getBoundingClientRect().bottom;
+      const ft = panel.querySelector('.jfoot');
+      const hd = panel.querySelector('.hhead');
+      m.style.top = '0px';
+      m.style.left = '0px';
+      panel.appendChild(m);
+      const mw = m.offsetWidth, mh = m.offsetHeight;
+      const pr = panel.getBoundingClientRect();
+      const topLimit = (hd ? hd.getBoundingClientRect().bottom : pr.top) + 4;
+      const botLimit = (ft ? ft.getBoundingClientRect().top : pr.bottom) - 6;
+      let rr = row.getBoundingClientRect();
+      // 아래에 자리가 모자라면 먼저 목록을 올려 본다
+      if (rr.bottom + 6 + mh > botLimit && body) {
+        const need = rr.bottom + 6 + mh - botLimit;
         const room = body.scrollHeight - body.clientHeight - body.scrollTop;
-        if (mb > limit) {
-          if (mb - limit <= room) body.scrollBy({ top: mb - limit, behavior: 'smooth' });
-          else {
-            m.style.top = 'auto';
-            m.style.bottom = 'calc(100% + 6px)';
-            m.style.transformOrigin = m.style.transformOrigin.replace(/ 0$/, ' 100%');
-            const mt = m.getBoundingClientRect().top;
-            if (mt < br.top + 4) body.scrollBy({ top: mt - br.top - 4, behavior: 'smooth' });
-          }
-        }
+        if (room > 0) { body.scrollTop += Math.min(need, room); rr = row.getBoundingClientRect(); }
       }
+      let y, below = true;
+      if (rr.bottom + 6 + mh <= botLimit) y = rr.bottom + 6;
+      else if (rr.top - 6 - mh >= topLimit) { y = rr.top - 6 - mh; below = false; }
+      else { y = Math.max(topLimit, Math.min(botLimit - mh, rr.bottom - mh - 8)); below = false; }
+      let x = rr.left + rr.width / 2 - mw / 2;
+      x = Math.max(pr.left + 8, Math.min(pr.right - 8 - mw, x));
+      m.style.left = (x - pr.left) + 'px';
+      m.style.top = (y - pr.top) + 'px';
+      m.style.transformOrigin = (rr.left + rr.width / 2 - x) + 'px ' + (below ? '0' : '100%');
+      cmenu = { el: m, row, at: performance.now() };
+      if (m.animate) m.animate([{ opacity: 0, transform: `translateY(${below ? -6 : 6}px) scale(.8)` }, { opacity: 1, transform: 'none' }],
+        { duration: 320, easing: SWAP_EASE });
     }
     function longPress(row, getActs) {
       let t = 0, x0 = 0, y0 = 0, fx = null;
@@ -4353,10 +4375,34 @@
     let metaSheet = null;
     try { metaSheet = new CSSStyleSheet(); metaSheet.replaceSync(PANEL_CSS); } catch (e) { metaSheet = null; }
 
+    // 꾹 눌러 띄운 팝업: 그 카드와 팝업만 또렷하고 나머지(목록 · 하단 버튼)는 흐려진다. 흐린 곳을 누르면 닫힌다
+    let dimEl = null;
+    function dimOn(card) {
+      const gc = card.parentElement;
+      if (!gc) return;
+      if (!dimEl) dimEl = document.createElement('hk-dim');
+      dimEl.classList.remove('hk-stray');
+      gc.appendChild(dimEl);
+      void dimEl.offsetWidth;
+      dimEl.classList.add('on');
+      card.classList.add('hk-lpfocus');
+      root.classList.add('dim');
+    }
+    function dimOff(card) {
+      root.classList.remove('dim');
+      if (dimEl) {
+        const d = dimEl;
+        d.classList.remove('on');
+        setTimeout(() => { if (!d.classList.contains('on')) d.remove(); }, 260);
+      }
+      if (card) setTimeout(() => { if (!(meta && meta.card === card && meta.kind === 'block')) card.classList.remove('hk-lpfocus'); }, 260);
+    }
+
     function closeMeta(instant) {
       const m = meta;
       meta = null;
       if (!m) return;
+      if (m.kind === 'block') dimOff(m.card);
       const done = () => {
         try { m.host.remove(); } catch (e) {}
         if (!(meta && meta.card === m.card)) m.card.classList.remove('hk-metaon');
@@ -4406,6 +4452,7 @@
       card.classList.add('hk-metaon');
       card.appendChild(h);
       meta = { host: h, pop, card, kind };
+      if (kind === 'block') dimOn(card);
       if (kind === 'block') renderBlockPop(pop, o);
       else renderMeta(pop);
       pop.classList.add('open');
