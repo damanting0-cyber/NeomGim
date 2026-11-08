@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.17.0
+// @version      1.17.1
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.17.0';
+  const VERSION = '1.17.1';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -435,10 +435,6 @@
     .gallery-content > div[data-hk-done].hk-img-ok {
       background: #1e1e22; border-color: rgba(255, 255, 255, 0.1);
       box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
-    }
-    .gallery-content > div[data-hk-done].hk-img-ok:active {
-      transform: scale(.97);
-      transition: transform .12s ease-out, box-shadow .3s ease;
     }
     @media (max-width: 520px) {
       .gallery-content { gap: 30px 24px !important; padding: 0 14px !important; }
@@ -969,7 +965,7 @@
       padding: 6px; border-radius: 16px; background: rgba(255, 255, 255, 0.08);
       transition: background .3s var(--ease), transform .3s var(--ease);
     }
-    .item:active { background: rgba(255, 255, 255, 0.14); transform: scale(.97); transition-duration: .12s; }
+    .item:active { background: rgba(255, 255, 255, 0.14); transition-duration: .12s; }
     .item img { -webkit-touch-callout: none; -webkit-user-drag: none; }
     .item.menu-on { z-index: 6; background: rgba(255, 255, 255, 0.16); transform: none; }
     .info .pid { color: #fff; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -3762,15 +3758,21 @@
       }
     }
     function longPress(row, getActs) {
-      let t = 0, x0 = 0, y0 = 0;
-      const cancel = () => clearTimeout(t);
+      let t = 0, x0 = 0, y0 = 0, fx = null;
+      const cancel = () => {
+        clearTimeout(t);
+        if (fx) { fx.release(); fx = null; }
+      };
       row.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         if (e.target.closest && e.target.closest('.cmenu')) return;
         x0 = e.clientX;
         y0 = e.clientY;
         clearTimeout(t);
+        if (fx) fx.release();
+        fx = pressFx(row);
         t = setTimeout(() => {
+          if (fx) { fx.pop(); fx = null; }
           lpJust = true;
           try { if (navigator.vibrate) navigator.vibrate(10); } catch (err) {}
           openCardMenu(row, getActs());
@@ -4957,7 +4959,42 @@
   }
 
   // 홈 카드 꾹 누르기 → 카드 아래에 차단 팝업
-  const homeLp = { t: 0, x: 0, y: 0, just: false };
+  // 누르고 있는 동안 카드가 점점 눌리고, 손을 떼면 돌아오고, 꾹 누르기가 되면 톡 튀어 오른다
+  function pressFx(el) {
+    const none = { release() {}, pop() {} };
+    if (!el || !el.animate) return none;
+    el.getAnimations().forEach(a => { if (a.id === 'hk-press') a.cancel(); });
+    const a = el.animate([
+      { transform: 'scale(1)' },
+      { transform: 'scale(.965)', offset: .25 },
+      { transform: 'scale(.93)' }
+    ], { duration: 450, easing: 'ease-out', fill: 'forwards' });
+    a.id = 'hk-press';
+    let done = false;
+    return {
+      release() {
+        if (done) return;
+        done = true;
+        try {
+          a.updatePlaybackRate(-2.5);
+          a.onfinish = () => a.cancel();
+        } catch (e) { a.cancel(); }
+      },
+      pop() {
+        if (done) return;
+        done = true;
+        const k = new DOMMatrixReadOnly(getComputedStyle(el).transform === 'none' ? undefined : getComputedStyle(el).transform).a || 1;
+        a.cancel();
+        const b = el.animate([
+          { transform: `scale(${k})` }, { transform: 'scale(1.03)', offset: .55 }, { transform: 'scale(1)' }
+        ], { duration: 340, easing: 'ease-out' });
+        b.id = 'hk-press';
+      }
+    };
+  }
+
+  const homeLp = { t: 0, x: 0, y: 0, just: false, fx: null };
+  const homeRelease = () => { if (homeLp.fx) { homeLp.fx.release(); homeLp.fx = null; } };
   const cardHostIn = path => path.find(n => n && n.classList && n.classList.contains('hk-card-host'));
   document.addEventListener('pointerdown', e => {
     homeLp.just = false;
@@ -4968,18 +5005,21 @@
     if (!hostEl || !hostEl._hkInfo) return;
     homeLp.x = e.clientX;
     homeLp.y = e.clientY;
+    homeRelease();
+    homeLp.fx = pressFx(hostEl.parentElement);
     homeLp.t = setTimeout(() => {
       homeLp.t = 0;
       homeLp.just = true;
+      if (homeLp.fx) { homeLp.fx.pop(); homeLp.fx = null; }
       try { if (navigator.vibrate) navigator.vibrate(10); } catch (err) {}
       if (openCardMeta) openCardMeta(hostEl._hkInfo, hostEl, 'block');
     }, 450);
   }, true);
   document.addEventListener('pointermove', e => {
     if (!homeLp.t) return;
-    if (Math.abs(e.clientX - homeLp.x) > 8 || Math.abs(e.clientY - homeLp.y) > 8) { clearTimeout(homeLp.t); homeLp.t = 0; }
+    if (Math.abs(e.clientX - homeLp.x) > 8 || Math.abs(e.clientY - homeLp.y) > 8) { clearTimeout(homeLp.t); homeLp.t = 0; homeRelease(); }
   }, true);
-  ['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, () => { clearTimeout(homeLp.t); homeLp.t = 0; }, true));
+  ['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, () => { clearTimeout(homeLp.t); homeLp.t = 0; homeRelease(); }, true));
   document.addEventListener('contextmenu', e => {
     if (cardHostIn(e.composedPath())) e.preventDefault();
   }, true);
