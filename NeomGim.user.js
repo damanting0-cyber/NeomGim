@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.18.4
+// @version      1.18.5
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.18.4';
+  const VERSION = '1.18.5';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -400,7 +400,7 @@
     }
     hk-dim.on { opacity: 1; }
     /* 꾹 눌러 띄운 카드(hk-lpfocus)는 빼야 한다. 이 규칙이 눌림·올라옴 애니메이션을 덮어써서 카드가 툭 튀었다 */
-    .gallery-content > div.hk-metaon:not(.hk-lpfocus):active { transform: none !important; }
+    .gallery-content > div.hk-metaon:not(.hk-lpfocus):not(.hk-pressing):active { transform: none !important; }
     ${settings.infinite ? 'html:not(.hk-pager-on) .page-container { display: none !important; }' : ''}
     .gallery-content .hk-hide { display: none !important; }
     ${settings.cardStyle ? `
@@ -729,6 +729,7 @@
     .root.morph .bar, .root.morph .filt, .root.morph .tl { animation: none; }
     .wrap > .tl, .bottom { transition: opacity .25s ease, filter .25s ease; }
     .root.dim .wrap > .tl, .root.dim .bottom { filter: blur(5px); opacity: .6; }
+    .root.snap .wrap > .tl, .root.snap .bottom { transition: none; }
     .root.dim .wrap > .tl, .root.dim .wrap > .tl *, .root.dim .bottom, .root.dim .bottom * { pointer-events: none !important; }
     @keyframes hkWrapIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
     .glass {
@@ -3844,7 +3845,7 @@
         y0 = e.clientY;
         clearTimeout(t);
         if (fx) fx.release();
-        fx = pressFx(row);
+        fx = pressFx(row, e.clientX, e.clientY);
         t = setTimeout(() => {
           if (fx) { fx.pop(); fx = null; }
           lpJust = true;
@@ -4459,7 +4460,16 @@
         root.classList.add('dim');
       }));
     }
-    function dimOff(card) {
+    function dimOff(card, now) {
+      if (now) {
+        // 카드를 다시 눌렀을 때: 흐림을 기다리지 않고 바로 걷는다
+        root.classList.add('snap');
+        root.classList.remove('dim');
+        requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('snap')));
+        if (dimEl) { dimEl.classList.remove('on'); dimEl.remove(); }
+        if (card) card.classList.remove('hk-lpfocus');
+        return;
+      }
       root.classList.remove('dim');
       if (dimEl) {
         const d = dimEl;
@@ -4469,11 +4479,11 @@
       if (card) setTimeout(() => { if (!(meta && meta.card === card && meta.kind === 'block')) card.classList.remove('hk-lpfocus'); }, 300);
     }
 
-    function closeMeta(instant) {
+    function closeMeta(instant, dimNow) {
       const m = meta;
       meta = null;
       if (!m) return;
-      if (m.kind === 'block') dimOff(m.card);
+      if (m.kind === 'block') dimOff(m.card, dimNow);
       const done = () => {
         try { m.host.remove(); } catch (e) {}
         if (!(meta && meta.card === m.card)) m.card.classList.remove('hk-metaon');
@@ -4497,6 +4507,13 @@
       m.pop.style.transformOrigin = (r.left + r.width / 2 - left) + 'px ' + (down ? '0' : '100%');
     }
     window.addEventListener('resize', () => { if (meta) placeMeta(meta); });
+
+    // 꾹 눌러 띄운 팝업이 떠 있는 카드를 다시 누르면: 흐림은 바로 걷고 팝업은 닫힌다
+    window.__hkDismissBlock = card => {
+      if (!(meta && meta.kind === 'block' && meta.card === card)) return false;
+      closeMeta(false, true);
+      return true;
+    };
 
     openCardMeta = (o, hostEl, kind) => {
       kind = kind || 'meta';
@@ -5100,52 +5117,60 @@
   // 눌림 · 튀어 오름 같은 크기 변화를 뺀, 원래 크기의 자리 (팝업 위치를 정할 때 쓴다)
   function layoutRect(el) {
     const r = el.getBoundingClientRect();
-    let k = 1;
-    try {
-      const t = getComputedStyle(el).transform;
-      if (t && t !== 'none') k = new DOMMatrixReadOnly(t).a || 1;
-    } catch (e) {}
-    if (Math.abs(k - 1) < 0.001) return r;
-    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, w = r.width / k, h = r.height / k;
+    let t = 'none';
+    try { t = getComputedStyle(el).transform; } catch (e) {}
+    if (!t || t === 'none') return r;
+    // 눌림 · 기울기가 있어도 가운데는 거의 그대로이므로, 가운데에 원래 크기를 놓는다
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, w = el.offsetWidth, h = el.offsetHeight;
     return { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2, width: w, height: h };
   }
 
-  // 누르고 있는 동안 카드가 점점 눌리고, 손을 떼면 돌아오고, 꾹 누르기가 되면 톡 튀어 오른다
-  // 지금 보이는 크기(애니메이션 중이면 그 순간 크기)
-  function curScale(el) {
-    try {
-      const t = getComputedStyle(el).transform;
-      return t && t !== 'none' ? (new DOMMatrixReadOnly(t).a || 1) : 1;
-    } catch (e) { return 1; }
-  }
-  // from → 1 로 스프링처럼 돌아온다 (속도가 이어지게 프레임을 미리 계산해 둔다)
-  function springScale(el, from, stiff, damp, frames) {
-    const xs = springKeys(from, 1, stiff, damp, frames);
-    xs[xs.length - 1] = 1;
-    const b = el.animate(xs.map(x => ({ transform: 'scale(' + x.toFixed(4) + ')' })),
-      { duration: Math.round(frames * 1000 / 60), easing: 'linear' });
-    b.id = 'hk-press';
-    return b;
-  }
+  // ----- 카드 누르기: 누른 곳이 안으로 들어가듯 기울며 눌린다 -----
+  const P_DUR = 440;     // 바닥까지 눌리는 시간 (꾹 누르기가 될 즈음 바닥)
+  const P_SCALE = 0.045; // 가장 깊이 눌렸을 때 줄어드는 정도
+  const P_TILT = 8;      // 가장자리를 눌렀을 때 기우는 각도(도)
+  const P_FR = 27;
+  const pEase = t => 1 - Math.pow(1 - t, 3);
 
-  // 누르고 있는 동안 카드가 부드럽게 눌리고, 손을 떼면 그 자리에서 돌아오고, 꾹 누르기가 되면 톡 올라온다
-  function pressFx(el) {
+  // 누르고 있는 동안 카드가 누른 곳 쪽으로 기울며 눌리고, 손을 떼면 그 자리에서 돌아오고, 꾹 누르기가 되면 톡 올라온다
+  // px, py: 손가락 위치 (없으면 가운데를 누른 것처럼 기울지 않고 눌리기만 한다)
+  function pressFx(el, px, py) {
     const none = { release() {}, pop() {} };
     if (!el || !el.animate) return none;
     el.getAnimations().forEach(a => { if (a.id === 'hk-press') a.cancel(); });
+    const r = el.getBoundingClientRect();
+    const clamp = v => Math.max(-1, Math.min(1, v));
+    const nx = px == null || !r.width ? 0 : clamp((px - (r.left + r.width / 2)) / (r.width / 2));
+    const ny = py == null || !r.height ? 0 : clamp((py - (r.top + r.height / 2)) / (r.height / 2));
+    // 오른쪽을 누르면 오른쪽이, 아래를 누르면 아래가 화면 안쪽으로 들어간다
+    const rx = -ny * P_TILT, ry = nx * P_TILT;
+    const persp = Math.round(Math.max(420, Math.max(r.width, r.height) * 3));
+    const pose = q => ({ transform: 'perspective(' + persp + 'px) rotateX(' + (rx * q).toFixed(2) + 'deg) rotateY(' +
+      (ry * q).toFixed(2) + 'deg) scale(' + (1 - P_SCALE * q).toFixed(4) + ')' });
+
     el.style.willChange = 'transform';
-    const unpromote = () => { if (!el.getAnimations().some(x => x.id === 'hk-press' && x.playState === 'running')) el.style.willChange = ''; };
-    // 꺾이는 곳 없이 한 번에 눌린다 (꾹 누르기가 될 즈음 바닥에 닿는다)
-    const a = el.animate([{ transform: 'scale(1)' }, { transform: 'scale(.94)' }],
-      { duration: 440, easing: 'cubic-bezier(.25, .6, .35, 1)', fill: 'forwards' });
+    el.classList.add('hk-pressing');
+    const unpromote = () => {
+      if (el.getAnimations().some(x => x.id === 'hk-press' && x.playState === 'running')) return;
+      el.style.willChange = '';
+      el.classList.remove('hk-pressing');
+    };
+    const frames = [];
+    for (let i = 0; i < P_FR; i++) frames.push(pose(pEase(i / (P_FR - 1))));
+    const a = el.animate(frames, { duration: P_DUR, easing: 'linear', fill: 'forwards' });
     a.id = 'hk-press';
     let done = false;
-    const back = (stiff, damp, frames) => {
+    const back = (stiff, damp, n) => {
       if (done) return;
       done = true;
-      const k = curScale(el);
+      // 지금 눌린 정도에서 스프링으로 돌아온다 (기울기와 크기가 함께)
+      const t = a.currentTime == null ? P_DUR : a.currentTime;
+      const q0 = pEase(Math.min(1, Math.max(0, t / P_DUR)));
       a.cancel();
-      const b = springScale(el, k, stiff, damp, frames);
+      const qs = springKeys(q0, 0, stiff, damp, n);
+      qs[qs.length - 1] = 0;
+      const b = el.animate(qs.map(pose), { duration: Math.round(n * 1000 / 60), easing: 'linear' });
+      b.id = 'hk-press';
       b.onfinish = () => setTimeout(unpromote, 200);
       b.oncancel = unpromote;
     };
@@ -5167,11 +5192,19 @@
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const hostEl = cardHostIn(e.composedPath());
     if (!hostEl || !hostEl._hkInfo) return;
-    if (hostEl.parentElement && hostEl.parentElement.classList.contains('hk-lpfocus')) return;
+    const card = hostEl.parentElement;
+    let dismissed = false;
+    if (card && card.classList.contains('hk-lpfocus')) {
+      // 팝업이 떠 있는 카드를 다시 누르면 흐림은 바로 걷고, 계속 누르고 있으면 다시 꾹 누르기가 된다
+      if (!(window.__hkDismissBlock && window.__hkDismissBlock(card))) return;
+      dismissed = true;
+    }
     homeLp.x = e.clientX;
     homeLp.y = e.clientY;
     homeRelease();
-    homeLp.fx = pressFx(hostEl.parentElement);
+    homeLp.fx = pressFx(card, e.clientX, e.clientY);
+    // 팝업만 닫으려고 누른 것이면, 손을 뗄 때 작품이 열리지 않게 한다
+    homeLp.just = dismissed;
     homeLp.t = setTimeout(() => {
       homeLp.t = 0;
       homeLp.just = true;
