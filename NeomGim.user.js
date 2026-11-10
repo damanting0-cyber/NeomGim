@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.18.3
+// @version      1.18.4
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.18.3';
+  const VERSION = '1.18.4';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -2988,20 +2988,33 @@
 
     // 앞 화면의 알약 폭에서 지금 폭으로 늘어나거나 줄어들고, 새로 생긴 버튼만 커지며 나타난다
     function morphBarFrom(v) {
-      const EASE = 'cubic-bezier(.22, 1, .36, 1)';
+      let EASE = 'cubic-bezier(.22, 1, .36, 1)';
+      // live: 앞 화면이 버튼을 바꾸는 도중에 넘어왔다. 이미 지난 만큼은 건너뛰고 남은 만큼만 이어서 움직인다
+      let k = 0, popDur = 420, popDelay = 120, wDur = 520;
+      if (v.live) {
+        const gone = Date.now() - v.t;
+        if (gone >= v.live) return;
+        const p = Math.max(0, gone / v.live);
+        k = 1 - Math.pow(1 - p, 4);
+        popDur = wDur = Math.max(80, v.live - gone);
+        popDelay = 0;
+        EASE = 'cubic-bezier(.33, 1, .68, 1)';
+      }
+      const kf0 = { opacity: k, transform: 'scale(' + (0.5 + 0.5 * k).toFixed(3) + ')' };
       const had = new Set(v.ids || []);
       const bar = $('#bar');
       if (bar) {
         const w1 = bar.offsetWidth;
         Array.from(bar.children).forEach(c => {
           if (c.id && had.has(c.id)) return;
-          if (c.animate) c.animate([{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'none' }],
-            { duration: 420, delay: 120, easing: EASE, fill: 'backwards' });
+          if (c.animate) c.animate([kf0, { opacity: 1, transform: 'none' }],
+            { duration: popDur, delay: popDelay, easing: EASE, fill: 'backwards' });
         });
-        if (v.w && Math.abs(w1 - v.w) > 1 && bar.animate) {
+        const w0 = v.w ? v.w + (w1 - v.w) * k : 0;
+        if (w0 && Math.abs(w1 - w0) > 1 && bar.animate) {
           bar.style.justifyContent = 'flex-end';
           bar.style.overflow = 'hidden';
-          const a = bar.animate([{ width: v.w + 'px' }, { width: w1 + 'px' }], { duration: 520, easing: EASE });
+          const a = bar.animate([{ width: w0 + 'px' }, { width: w1 + 'px' }], { duration: wDur, easing: EASE });
           const done = () => { bar.style.justifyContent = ''; bar.style.overflow = ''; };
           a.onfinish = done;
           a.oncancel = done;
@@ -3010,8 +3023,8 @@
       ['#tl', '#filt'].forEach(sel => {
         const e = $(sel);
         if (!e || had.has(e.id) || !e.animate) return;
-        e.animate([{ opacity: 0, transform: 'scale(.5)' }, { opacity: 1, transform: 'none' }],
-          { duration: 460, delay: 140, easing: EASE, fill: 'backwards' });
+        e.animate([kf0, { opacity: 1, transform: 'none' }],
+          { duration: v.live ? popDur : 460, delay: v.live ? 0 : 140, easing: EASE, fill: 'backwards' });
       });
     }
     const wrap = $('#wrap');
@@ -4993,7 +5006,7 @@
 
   // 다음 화면이 이어받을 수 있게 하단 알약의 폭과 들어 있던 버튼을 적어 둔다
   // done: 이미 다음 화면 모양으로 바꿔 두었으면 다음 화면은 애니메이션 없이 그대로 보여 준다
-  function saveBarState(done) {
+  function saveBarState(done, live) {
     try {
       const h = document.getElementById('hk-host');
       const r = h && h.shadowRoot;
@@ -5001,8 +5014,10 @@
       if (!bar) return;
       const ids = Array.from(bar.children).map(c => c.id).filter(Boolean);
       ['tl', 'filt'].forEach(k => { if (r.getElementById(k)) ids.push(k); });
-      sessionStorage.setItem('hk_bar', JSON.stringify({ w: bar.offsetWidth, ids, t: Date.now(), done: !!done }));
-      if (done) return;
+      const o = { w: bar.offsetWidth, ids, t: Date.now(), done: !!done };
+      if (live) o.live = live;
+      sessionStorage.setItem('hk_bar', JSON.stringify(o));
+      if (done || live) return;
       // 다음 화면에 없을 정렬 버튼 같은 것은 미리 접어 둔다
       ['filt', 'tl'].forEach(k => {
         const e = r.getElementById(k);
@@ -5019,9 +5034,15 @@
     return ok;
   }
 
+  // 버튼이 다 바뀔 때까지 기다리지 않고, 바뀌기 시작하는 것과 동시에 다음 화면으로 간다.
+  // 다음 화면이 뜰 때까지는 지금 화면에서 버튼이 바뀌고, 그 전에 넘어가면 다음 화면이 남은 만큼 이어서 바꾼다
   function leaveTo(url) {
-    const ok = morphUiTo(url, 320);
-    setTimeout(() => { location.href = url; }, ok ? 300 : 0);
+    const D = 320;
+    saveBarState(false, D);
+    let ok = false;
+    try { ok = !!(window.__hkMorphTo && window.__hkMorphTo(url, D)); } catch (e) {}
+    if (!ok) saveBarState(false);
+    location.href = url;
     setTimeout(() => { if (window.__hkMorphUndo) window.__hkMorphUndo(); }, 4500);
   }
 
