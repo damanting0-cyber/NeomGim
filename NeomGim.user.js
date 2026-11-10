@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.18.5
+// @version      1.18.6
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.18.5';
+  const VERSION = '1.18.6';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -992,6 +992,7 @@
     .panel.lpfocus .hhead, .panel.lpfocus .jfoot,
     .panel.lpfocus .list > :not(.menu-on) { filter: blur(4px); opacity: .45; }
     .panel.lpfocus .hhead *, .panel.lpfocus .jfoot * { pointer-events: none; }
+    .panel.snap .hhead, .panel.snap .jfoot, .panel.snap .list > *, .panel.snap .sdiv { transition: none !important; }
     .info .pid { color: #fff; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
     .cmenu {
       position: absolute; top: calc(100% + 6px); z-index: 12; display: flex; gap: 2px; padding: 4px;
@@ -3773,10 +3774,16 @@
     // ----- 카드 꾹 누르기 메뉴 -----
     let cmenu = null;
     let lpJust = false;
-    function closeCardMenu(instant) {
+    function closeCardMenu(instant, dimNow) {
       const m = cmenu;
       cmenu = null;
       if (!m) return;
+      if (dimNow) {
+        // 흐림을 기다리지 않고 바로 걷는다
+        panel.classList.add('snap');
+        root.classList.add('snap');
+        requestAnimationFrame(() => requestAnimationFrame(() => { panel.classList.remove('snap'); root.classList.remove('snap'); }));
+      }
       m.row.classList.remove('menu-on');
       panel.classList.remove('lpfocus');
       root.classList.remove('dim');
@@ -3840,12 +3847,16 @@
       row.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         if (e.target.closest && e.target.closest('.cmenu')) return;
-        if (row.classList.contains('menu-on')) return;
+        // 메뉴가 떠 있는 카드를 다시 누르면 흐림은 바로 걷히고, 계속 누르고 있으면 다시 꾹 누르기가 된다
+        // (짧게 누르고 떼면 메뉴만 닫히고 작품은 열리지 않는다)
+        const again = row.classList.contains('menu-on');
+        if (again) closeCardMenu(false, true);
         x0 = e.clientX;
         y0 = e.clientY;
         clearTimeout(t);
         if (fx) fx.release();
         fx = pressFx(row, e.clientX, e.clientY);
+        if (again) lpJust = true;
         t = setTimeout(() => {
           if (fx) { fx.pop(); fx = null; }
           lpJust = true;
@@ -5127,8 +5138,8 @@
 
   // ----- 카드 누르기: 누른 곳이 안으로 들어가듯 기울며 눌린다 -----
   const P_DUR = 440;     // 바닥까지 눌리는 시간 (꾹 누르기가 될 즈음 바닥)
-  const P_SCALE = 0.045; // 가장 깊이 눌렸을 때 줄어드는 정도
-  const P_TILT = 8;      // 가장자리를 눌렀을 때 기우는 각도(도)
+  const P_SCALE = 0.05;  // 가장 깊이 눌렸을 때 줄어드는 정도
+  const P_TILT = 15;     // 가장자리를 눌렀을 때 기우는 각도(도)
   const P_FR = 27;
   const pEase = t => 1 - Math.pow(1 - t, 3);
 
@@ -5144,9 +5155,26 @@
     const ny = py == null || !r.height ? 0 : clamp((py - (r.top + r.height / 2)) / (r.height / 2));
     // 오른쪽을 누르면 오른쪽이, 아래를 누르면 아래가 화면 안쪽으로 들어간다
     const rx = -ny * P_TILT, ry = nx * P_TILT;
-    const persp = Math.round(Math.max(420, Math.max(r.width, r.height) * 3));
+    const persp = Math.round(Math.max(360, Math.max(r.width, r.height) * 2.4));
     const pose = q => ({ transform: 'perspective(' + persp + 'px) rotateX(' + (rx * q).toFixed(2) + 'deg) rotateY(' +
       (ry * q).toFixed(2) + 'deg) scale(' + (1 - P_SCALE * q).toFixed(4) + ')' });
+
+    // 빛 반사: 들어간 곳은 살짝 어두워지고, 반대편(앞으로 들린 쪽)에 빛이 맺힌다. 눌린 정도에 따라 함께 켜지고 꺼진다
+    el.querySelectorAll(':scope > .hk-glare').forEach(g => g.remove());
+    const glare = document.createElement('div');
+    glare.className = 'hk-glare';
+    // 빛은 위에서 비친다고 보고, 누른 반대쪽으로 옮긴다 (가운데를 눌러도 빛과 그늘이 겹치지 않게)
+    const gx = (50 - nx * 46).toFixed(1) + '%', gy = Math.max(0, 24 - ny * 34).toFixed(1) + '%';
+    const sx = (50 + nx * 40).toFixed(1) + '%', sy = (50 + ny * 40).toFixed(1) + '%';
+    let rad = '18px';
+    try { rad = getComputedStyle(el).borderRadius || rad; } catch (e) {}
+    glare.style.cssText = 'position:absolute!important;top:0!important;right:0!important;bottom:0!important;left:0!important;' +
+      'z-index:35!important;pointer-events:none!important;border-radius:' + rad + '!important;opacity:0;' +
+      'background:radial-gradient(circle at ' + gx + ' ' + gy + ', rgba(255,255,255,.5), rgba(255,255,255,.14) 38%, rgba(255,255,255,0) 66%),' +
+      'radial-gradient(circle at ' + sx + ' ' + sy + ', rgba(0,0,0,.26), rgba(0,0,0,0) 58%)!important;' +
+      'mix-blend-mode:overlay;';
+    el.appendChild(glare);
+    const glow = q => ({ opacity: Math.max(0, Math.min(1, q)).toFixed(3) });
 
     el.style.willChange = 'transform';
     el.classList.add('hk-pressing');
@@ -5154,11 +5182,13 @@
       if (el.getAnimations().some(x => x.id === 'hk-press' && x.playState === 'running')) return;
       el.style.willChange = '';
       el.classList.remove('hk-pressing');
+      glare.remove();
     };
-    const frames = [];
-    for (let i = 0; i < P_FR; i++) frames.push(pose(pEase(i / (P_FR - 1))));
+    const frames = [], qs0 = [];
+    for (let i = 0; i < P_FR; i++) { const q = pEase(i / (P_FR - 1)); qs0.push(q); frames.push(pose(q)); }
     const a = el.animate(frames, { duration: P_DUR, easing: 'linear', fill: 'forwards' });
     a.id = 'hk-press';
+    const ga = glare.animate(qs0.map(glow), { duration: P_DUR, easing: 'linear', fill: 'forwards' });
     let done = false;
     const back = (stiff, damp, n) => {
       if (done) return;
@@ -5167,9 +5197,12 @@
       const t = a.currentTime == null ? P_DUR : a.currentTime;
       const q0 = pEase(Math.min(1, Math.max(0, t / P_DUR)));
       a.cancel();
+      ga.cancel();
       const qs = springKeys(q0, 0, stiff, damp, n);
       qs[qs.length - 1] = 0;
-      const b = el.animate(qs.map(pose), { duration: Math.round(n * 1000 / 60), easing: 'linear' });
+      const dur = Math.round(n * 1000 / 60);
+      const b = el.animate(qs.map(pose), { duration: dur, easing: 'linear' });
+      glare.animate(qs.map(glow), { duration: dur, easing: 'linear', fill: 'forwards' });
       b.id = 'hk-press';
       b.onfinish = () => setTimeout(unpromote, 200);
       b.oncancel = unpromote;
@@ -6253,7 +6286,7 @@
     if (window.__hkEdges) window.__hkEdges();
   }
 
-  const OURS_SEL = '#hk-host, #hk-fx-ov, #hk-cover, #hk-sentinel, #hk-bg, #hk-empty, .hk-zoom, .hk-wrap, .hk-card-host, .hk-meta-host';
+  const OURS_SEL = '#hk-host, #hk-fx-ov, #hk-cover, #hk-sentinel, #hk-bg, #hk-empty, .hk-zoom, .hk-wrap, .hk-card-host, .hk-meta-host, .hk-glare';
   const isOursNode = n => !!(n && n.nodeType === 1 && n.closest && n.closest(OURS_SEL));
   const observer = new MutationObserver(muts => {
     if (runT) return;
