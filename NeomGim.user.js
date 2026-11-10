@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.18.1
+// @version      1.18.2
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.18.1';
+  const VERSION = '1.18.2';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -446,6 +446,10 @@
     }
     @media (max-width: 520px) {
       .gallery-content { gap: 30px 24px !important; padding: 0 14px !important; }
+    }
+    /* '동작 줄이기'를 켠 기기에서는 로딩 중 깜빡임을 멈춘다 (다 받은 뒤 사라지는 것은 그대로) */
+    @media (prefers-reduced-motion: reduce) {
+      .gallery-content > div:not(.hk-img-ok)::before { animation: none !important; }
     }` : ''}
   `;
 
@@ -516,9 +520,9 @@
       font-size: 13px; font-weight: 600; line-height: 1.35; letter-spacing: -0.01em;
       transition: color .25s ease;
     }
-    .dline { font-size: 10.5px; line-height: 1.3; color: rgba(0, 0, 0, 0.5); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dline { font-size: 10.5px; line-height: 1.3; color: rgba(0, 0, 0, 0.6); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dline:empty { display: none; }
-    .card.viewed .dline { color: rgba(0, 0, 0, 0.62); }
+    .card.viewed .dline { color: rgba(0, 0, 0, 0.66); }
     .card.viewed .info {
       background: #bcd4f5;
     }
@@ -722,7 +726,7 @@
     .root.leave .wrap { opacity: 0; transform: translateY(10px); transition: opacity .28s ease, transform .28s ease; }
     .root.enter .wrap { animation: hkWrapIn .5s var(--ease) .12s backwards; }
     .root.morph .bar, .root.morph .filt, .root.morph .tl { animation: none; }
-    .wrap > .tl, .bottom { transition: opacity .25s ease; }
+    .wrap > .tl, .bottom { transition: opacity .25s ease, filter .25s ease; }
     .root.dim .wrap > .tl, .root.dim .bottom { filter: blur(5px); opacity: .6; }
     .root.dim .wrap > .tl, .root.dim .wrap > .tl *, .root.dim .bottom, .root.dim .bottom * { pointer-events: none !important; }
     @keyframes hkWrapIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
@@ -800,6 +804,9 @@
       line-height: 24px; color: var(--sub); transition: background .2s, color .2s, transform .3s var(--ease);
     }
     .sg .x:active { color: #fff; background: rgba(255, 255, 255, 0.14); transform: scale(.88); }
+    /* ✕ 는 작게 보이지만 누르는 범위는 넓게 (빗나가서 그 줄이 눌려 작품으로 넘어가지 않게) */
+    .sg .x { position: relative; }
+    .sg .x::after { content: ''; position: absolute; top: -10px; right: -10px; bottom: -10px; left: -10px; }
 
     .slist { display: flex; flex-direction: column; gap: 4px; }
     .srow {
@@ -1118,6 +1125,24 @@
       font: 11px/1.5 ui-monospace, Menlo, Consolas, monospace;
       white-space: pre-wrap; word-break: break-all; max-height: 46vh; overflow-y: auto;
       scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .28) transparent;
+    }
+
+    .tog:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.7); outline-offset: 2px; }
+    /* 마우스를 쓸 때만: 올려놓으면 살짝 밝아진다 (터치 화면에는 적용되지 않는다) */
+    @media (hover: hover) and (pointer: fine) {
+      .ib:hover:not(.active) { background: rgba(255, 255, 255, 0.10); }
+      .hfix:hover:not(.active) { background: rgba(46, 46, 52, 0.9); }
+      .filt:hover { border-color: rgba(255, 255, 255, 0.42); }
+      .tl .pg:hover { opacity: .8; }
+      .btn:hover:not(.primary) { background: rgba(255, 255, 255, 0.16); }
+      .srow:hover:not(.on), .sg:hover:not(.hl) { background: rgba(255, 255, 255, 0.09); }
+      .tog:hover:not(.on) { background: rgba(255, 255, 255, 0.11); }
+      .segb:hover:not(.on) { color: #fff; }
+      .chip:hover { border-color: rgba(255, 255, 255, 0.6); }
+      .cmb:hover { background: rgba(255, 255, 255, 0.10); }
+      .item:hover:not(.life):not(.menu-on) { background: rgba(255, 255, 255, 0.12); }
+      .sdiv:hover { background: rgba(255, 255, 255, 0.06); }
+      .bkb:hover { background: rgba(255, 90, 90, 0.2); }
     }
 
     @media (max-width: 520px) {
@@ -2774,7 +2799,7 @@
         ${IS_WORK_PAGE ? '' : '<div class="fxtop"></div><div class="fxbot"></div>'}
                 <div class="wrap" id="wrap">
           <div class="stack">
-            <div class="toast pill" id="toast"></div>
+            <div class="toast pill" id="toast" role="status" aria-live="polite"></div>
             <div class="ask pill" id="ask"></div>
             <div class="panel pill" id="panel"></div>
           </div>
@@ -3199,6 +3224,17 @@
       };
       const tryPlace = n => { if (!place(false) && n < 30) requestAnimationFrame(() => tryPlace(n + 1)); };
       requestAnimationFrame(() => tryPlace(0));
+      // 화면을 돌리거나 창 폭이 바뀌면 선택 표시도 새 자리로 옮긴다
+      if (typeof ResizeObserver === 'function') {
+        let w = 0;
+        new ResizeObserver(() => {
+          const nw = seg.offsetWidth;
+          if (nw === w) return;
+          const first = !w;
+          w = nw;
+          if (!first && seg.classList.contains('slide')) place(false);
+        }).observe(seg);
+      }
       return seg;
     }
 
@@ -3298,7 +3334,7 @@
       if (isNum(s)) { pushHist(s); goTo(s); return; }
       let q = s;
       if (!/language:/i.test(q)) q += ' language:korean';
-      location.href = '/search.html?query=' + encodeURIComponent(q);
+      fxGo('/search.html?query=' + encodeURIComponent(q));
     }
 
     function moveHl(d) {
@@ -4023,6 +4059,7 @@
       saveList();
       updateCounts();
       renderItems();
+      if (panelMode === 'set') growRender(renderSettings);
       toast(`${added}개 추가됨`);
     }
 
@@ -4034,7 +4071,7 @@
       SORTS.forEach(([key, url]) => {
         const b = el('button', 'srow' + (key === cur ? ' on' : ''), SORT_KR[key] || key);
         b.type = 'button';
-        b.addEventListener('click', () => { location.href = url; });
+        b.addEventListener('click', () => fxGo(url));
         list.appendChild(b);
       });
       panel.appendChild(list);
@@ -4053,12 +4090,19 @@
       ].forEach(([key, label]) => {
         const t = el('div', 'tog' + (key in pendingSet ? (pendingSet[key] ? ' on' : '') : (settings[key] ? ' on' : '')), label);
         t.setAttribute('role', 'switch');
+        t.tabIndex = 0;
+        t.setAttribute('aria-checked', t.classList.contains('on') ? 'true' : 'false');
         t.dataset.k = key;
+        t.addEventListener('keydown', e => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          t.click();
+        });
         t.addEventListener('click', () => {
           if (['koreanOnly', 'infinite'].includes(key)) {
             // 토글은 바로 바뀌고, 저장된 값과 달라지면 위에 "새로고침할까요?" 팝업이 뜬다
             const next = !t.classList.contains('on');
-            t.classList.toggle('on', next);
+            setTog(t, next);
             if (next === !!settings[key]) delete pendingSet[key];
             else pendingSet[key] = next;
             if (Object.keys(pendingSet).length) showAsk();
@@ -4067,7 +4111,7 @@
           }
           settings[key] = !settings[key];
           saveSettings();
-          t.classList.toggle('on', !!settings[key]);
+          setTog(t, settings[key]);
           if (key === 'blockOn') { applyBlocks(); mergeDuplicates(); }
           if (key === 'preload' && settings.preload) {
             if (IS_READER) initReaderPreload();
@@ -4100,6 +4144,11 @@
       panel.appendChild(br);
     }
 
+    function setTog(t, on) {
+      t.classList.toggle('on', !!on);
+      t.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+
     // ----- 새로고침이 필요한 설정 확인 팝업 -----
     const pendingSet = {};
     function hideAsk() {
@@ -4109,7 +4158,7 @@
     function revertPending() {
       Object.keys(pendingSet).forEach(k => {
         const t = panel.querySelector('.tog[data-k="' + k + '"]');
-        if (t) t.classList.toggle('on', !!settings[k]);
+        if (t) setTog(t, settings[k]);
         delete pendingSet[k];
       });
       hideAsk();
@@ -4401,9 +4450,9 @@
       if (dimEl) {
         const d = dimEl;
         d.classList.remove('on');
-        setTimeout(() => { if (!d.classList.contains('on')) d.remove(); }, 260);
+        setTimeout(() => { if (!d.classList.contains('on')) d.remove(); }, 300);
       }
-      if (card) setTimeout(() => { if (!(meta && meta.card === card && meta.kind === 'block')) card.classList.remove('hk-lpfocus'); }, 260);
+      if (card) setTimeout(() => { if (!(meta && meta.card === card && meta.kind === 'block')) card.classList.remove('hk-lpfocus'); }, 300);
     }
 
     function closeMeta(instant) {
@@ -4754,6 +4803,12 @@
 
     document.addEventListener('keydown', e => {
       if (e.composedPath().includes(host)) return;
+      if (e.key === 'Escape' && (panelMode || metaOpen())) {
+        e.stopPropagation();
+        if (metaOpen()) closeMeta();
+        if (panelMode) setPanel(null, true);
+        return;
+      }
       if (!panelMode) return;
       const k = e.key;
       if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowDown' ||
