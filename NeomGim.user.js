@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.18.2
+// @version      1.18.3
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.18.2';
+  const VERSION = '1.18.3';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -399,7 +399,8 @@
       opacity: 0; transition: opacity .28s ease; will-change: opacity;
     }
     hk-dim.on { opacity: 1; }
-    .gallery-content > div.hk-metaon:active { transform: none !important; }
+    /* 꾹 눌러 띄운 카드(hk-lpfocus)는 빼야 한다. 이 규칙이 눌림·올라옴 애니메이션을 덮어써서 카드가 툭 튀었다 */
+    .gallery-content > div.hk-metaon:not(.hk-lpfocus):active { transform: none !important; }
     ${settings.infinite ? 'html:not(.hk-pager-on) .page-container { display: none !important; }' : ''}
     .gallery-content .hk-hide { display: none !important; }
     ${settings.cardStyle ? `
@@ -5089,39 +5090,49 @@
   }
 
   // 누르고 있는 동안 카드가 점점 눌리고, 손을 떼면 돌아오고, 꾹 누르기가 되면 톡 튀어 오른다
+  // 지금 보이는 크기(애니메이션 중이면 그 순간 크기)
+  function curScale(el) {
+    try {
+      const t = getComputedStyle(el).transform;
+      return t && t !== 'none' ? (new DOMMatrixReadOnly(t).a || 1) : 1;
+    } catch (e) { return 1; }
+  }
+  // from → 1 로 스프링처럼 돌아온다 (속도가 이어지게 프레임을 미리 계산해 둔다)
+  function springScale(el, from, stiff, damp, frames) {
+    const xs = springKeys(from, 1, stiff, damp, frames);
+    xs[xs.length - 1] = 1;
+    const b = el.animate(xs.map(x => ({ transform: 'scale(' + x.toFixed(4) + ')' })),
+      { duration: Math.round(frames * 1000 / 60), easing: 'linear' });
+    b.id = 'hk-press';
+    return b;
+  }
+
+  // 누르고 있는 동안 카드가 부드럽게 눌리고, 손을 떼면 그 자리에서 돌아오고, 꾹 누르기가 되면 톡 올라온다
   function pressFx(el) {
     const none = { release() {}, pop() {} };
     if (!el || !el.animate) return none;
     el.getAnimations().forEach(a => { if (a.id === 'hk-press') a.cancel(); });
     el.style.willChange = 'transform';
     const unpromote = () => { if (!el.getAnimations().some(x => x.id === 'hk-press' && x.playState === 'running')) el.style.willChange = ''; };
-    const a = el.animate([
-      { transform: 'scale(1)' },
-      { transform: 'scale(.965)', offset: .25 },
-      { transform: 'scale(.93)' }
-    ], { duration: 450, easing: 'ease-out', fill: 'forwards' });
+    // 꺾이는 곳 없이 한 번에 눌린다 (꾹 누르기가 될 즈음 바닥에 닿는다)
+    const a = el.animate([{ transform: 'scale(1)' }, { transform: 'scale(.94)' }],
+      { duration: 440, easing: 'cubic-bezier(.25, .6, .35, 1)', fill: 'forwards' });
     a.id = 'hk-press';
     let done = false;
+    const back = (stiff, damp, frames) => {
+      if (done) return;
+      done = true;
+      const k = curScale(el);
+      a.cancel();
+      const b = springScale(el, k, stiff, damp, frames);
+      b.onfinish = () => setTimeout(unpromote, 200);
+      b.oncancel = unpromote;
+    };
     return {
-      release() {
-        if (done) return;
-        done = true;
-        try {
-          a.updatePlaybackRate(-2.5);
-          a.onfinish = () => { a.cancel(); unpromote(); };
-        } catch (e) { a.cancel(); unpromote(); }
-      },
-      pop() {
-        if (done) return;
-        done = true;
-        const k = new DOMMatrixReadOnly(getComputedStyle(el).transform === 'none' ? undefined : getComputedStyle(el).transform).a || 1;
-        a.cancel();
-        const b = el.animate([
-          { transform: `scale(${k})` }, { transform: 'scale(1.03)', offset: .55 }, { transform: 'scale(1)' }
-        ], { duration: 340, easing: 'ease-out' });
-        b.id = 'hk-press';
-        b.onfinish = () => setTimeout(unpromote, 200);
-      }
+      // 짧게 눌렀다 떼면: 눌린 만큼에서 튕김 없이 돌아온다
+      release() { back(420, 34, 22); },
+      // 꾹 누르기가 되면: 바닥에서 살짝 넘치듯 올라온다
+      pop() { back(300, 19, 40); }
     };
   }
 
