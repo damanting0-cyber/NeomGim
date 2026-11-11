@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.18.6
+// @version      1.18.7
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.18.6';
+  const VERSION = '1.18.7';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -3787,7 +3787,8 @@
       m.row.classList.remove('menu-on');
       panel.classList.remove('lpfocus');
       root.classList.remove('dim');
-      if (instant || !m.el.animate) { m.el.remove(); return; }
+      if (m.padBody) m.padBody.style.paddingBottom = '';
+      if (instant || !m.el.animate || m.pending) { m.el.remove(); return; }
       const a = m.el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-4px) scale(.9)' }],
         { duration: 150, easing: 'ease-in', fill: 'forwards' });
       a.onfinish = () => m.el.remove();
@@ -3812,31 +3813,50 @@
       const hd = panel.querySelector('.hhead');
       m.style.top = '0px';
       m.style.left = '0px';
+      m.style.visibility = 'hidden';
       panel.appendChild(m);
       const mw = m.offsetWidth, mh = m.offsetHeight;
-      const pr = panel.getBoundingClientRect();
-      const topLimit = (hd ? hd.getBoundingClientRect().bottom : pr.top) + 4;
-      const botLimit = (ft ? ft.getBoundingClientRect().top : pr.bottom) - 6;
-      let rr = layoutRect(row);
-      // 아래에 자리가 모자라면 먼저 목록을 올려 본다
       const GAP = 14;
-      if (rr.bottom + GAP + mh > botLimit && body) {
-        const need = rr.bottom + GAP + mh - botLimit;
-        const room = body.scrollHeight - body.clientHeight - body.scrollTop;
-        if (room > 0) { body.scrollTop += Math.min(need, room); rr = layoutRect(row); }
+      const lims = () => {
+        const pr = panel.getBoundingClientRect();
+        return {
+          pr,
+          top: (hd ? hd.getBoundingClientRect().bottom : pr.top) + 4,
+          bot: (ft ? ft.getBoundingClientRect().top : pr.bottom) - 6
+        };
+      };
+      const cm = { el: m, row, at: performance.now(), pending: true, padBody: null };
+      cmenu = cm;
+      // 메뉴는 항상 카드 아래. 카드나 메뉴가 다 보이지 않으면 먼저 목록을 부드럽게 움직이고, 멈춘 뒤에 메뉴를 띄운다
+      const show = () => {
+        if (cmenu !== cm) return;
+        cm.pending = false;
+        cm.at = performance.now();
+        const L = lims();
+        const rr = layoutRect(row);
+        let x = rr.left + rr.width / 2 - mw / 2;
+        x = Math.max(L.pr.left + 8, Math.min(L.pr.right - 8 - mw, x));
+        m.style.left = (x - L.pr.left) + 'px';
+        m.style.top = (rr.bottom + GAP - L.pr.top) + 'px';
+        m.style.transformOrigin = (rr.left + rr.width / 2 - x) + 'px 0';
+        m.style.visibility = '';
+        if (m.animate) m.animate([{ opacity: 0, transform: 'translateY(-6px) scale(.8)' }, { opacity: 1, transform: 'none' }],
+          { duration: 320, easing: SWAP_EASE });
+      };
+      const L0 = lims();
+      const r0 = layoutRect(row);
+      let delta = 0;
+      if (r0.top < L0.top) delta = r0.top - L0.top - 4;
+      else if (r0.bottom + GAP + mh > L0.bot) delta = Math.min(r0.bottom + GAP + mh - L0.bot + 4, r0.top - L0.top);
+      if (!body || Math.abs(delta) < 2) { show(); return; }
+      // 목록 끝이라 더 올릴 자리가 없으면 아래에 잠깐 여백을 붙인다 (메뉴를 닫으면 걷는다)
+      const room = body.scrollHeight - body.clientHeight - body.scrollTop;
+      if (delta > room) {
+        const pb = parseFloat(getComputedStyle(body).paddingBottom) || 0;
+        body.style.paddingBottom = Math.ceil(pb + delta - room) + 'px';
+        cm.padBody = body;
       }
-      let y, below = true;
-      if (rr.bottom + GAP + mh <= botLimit) y = rr.bottom + GAP;
-      else if (rr.top - GAP - mh >= topLimit) { y = rr.top - GAP - mh; below = false; }
-      else { y = Math.max(topLimit, Math.min(botLimit - mh, rr.bottom - mh - 8)); below = false; }
-      let x = rr.left + rr.width / 2 - mw / 2;
-      x = Math.max(pr.left + 8, Math.min(pr.right - 8 - mw, x));
-      m.style.left = (x - pr.left) + 'px';
-      m.style.top = (y - pr.top) + 'px';
-      m.style.transformOrigin = (rr.left + rr.width / 2 - x) + 'px ' + (below ? '0' : '100%');
-      cmenu = { el: m, row, at: performance.now() };
-      if (m.animate) m.animate([{ opacity: 0, transform: `translateY(${below ? -6 : 6}px) scale(.8)` }, { opacity: 1, transform: 'none' }],
-        { duration: 320, easing: SWAP_EASE });
+      glide(() => body.scrollTop, y => { body.scrollTop = y; }, delta, show, () => cmenu === cm);
     }
     function longPress(row, getActs) {
       let t = 0, x0 = 0, y0 = 0, fx = null;
@@ -3885,7 +3905,7 @@
       closeCardMenu();
     }, true);
     // 메뉴를 보여 주려고 목록을 올리는 동안의 스크롤은 무시하고, 사용자가 스크롤할 때만 닫는다
-    panel.addEventListener('scroll', () => { if (cmenu && performance.now() - cmenu.at > 700) closeCardMenu(); }, true);
+    panel.addEventListener('scroll', () => { if (cmenu && !cmenu.pending && performance.now() - cmenu.at > 700) closeCardMenu(); }, true);
 
     // 카드를 줄이며 지운 뒤, 나머지 카드는 원래 자리에서 새 자리로 미끄러지게 옮긴다
     function removeCard(row, apply) {
@@ -4499,23 +4519,33 @@
         try { m.host.remove(); } catch (e) {}
         if (!(meta && meta.card === m.card)) m.card.classList.remove('hk-metaon');
       };
+      if (m.padded && document.body) document.body.style.paddingBottom = '122px';
       if (instant) { done(); return; }
       popClose(m.pop, null, done);
     }
 
-    // 여는 순간 한 번만 자리를 정한다 (아래 공간이 모자라면 위로). 그 뒤로는 카드와 같이 스크롤된다
+    // 팝업은 항상 카드 아래에 붙는다. 그 뒤로는 카드와 같이 스크롤된다
     function placeMeta(m) {
       const r = layoutRect(m.card);
-      const vw = window.innerWidth, vh = window.innerHeight;
+      const vw = window.innerWidth;
       const w = Math.min(Math.max(r.width + 40, 280), vw - 24);
       m.pop.style.width = w + 'px';
       const left = Math.max(12, Math.min(vw - w - 12, r.left + r.width / 2 - w / 2));
-      const h = m.pop.offsetHeight;
-      const below = vh - r.bottom - 12, above = r.top - 12;
-      const down = below >= h + 10 || below >= above;
       m.pop.style.left = (left - r.left) + 'px';
-      m.pop.style.top = (down ? r.height + 10 : -10 - h) + 'px';
-      m.pop.style.transformOrigin = (r.left + r.width / 2 - left) + 'px ' + (down ? '0' : '100%');
+      m.pop.style.top = (r.height + 10) + 'px';
+      m.pop.style.transformOrigin = (r.left + r.width / 2 - left) + 'px 0';
+    }
+    // 카드와 그 아래 팝업이 다 보이려면 화면을 얼마나 움직여야 하는지 (하단 버튼에 가리지 않게)
+    function metaScrollNeed(m) {
+      const r = layoutRect(m.card);
+      const h = m.pop.offsetHeight;
+      const wr = wrap.getBoundingClientRect();
+      const topLim = 12;
+      const botLim = (wr.height ? wr.top : window.innerHeight) - 10;
+      if (r.top < topLim) return r.top - topLim - 4;
+      const over = r.bottom + 10 + h - botLim;
+      // 카드와 팝업을 합친 것이 화면보다 크면 카드 위쪽에 맞춘다
+      return over > 0 ? Math.min(over + 4, r.top - topLim) : 0;
     }
     window.addEventListener('resize', () => { if (meta) placeMeta(meta); });
 
@@ -4556,7 +4586,23 @@
       else renderMeta(pop);
       pop.classList.add('open');
       placeMeta(meta);
-      popOpen(pop, null);
+      const mm = meta;
+      const delta = metaScrollNeed(mm);
+      if (Math.abs(delta) < 2) { popOpen(pop, null); return; }
+      // 카드나 팝업이 다 보이지 않으면: 팝업은 숨겨 둔 채 화면을 부드럽게 옮기고, 멈춘 뒤에 띄운다
+      pop.style.visibility = 'hidden';
+      const room = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+      if (delta > room && document.body) {
+        // 목록 끝이라 더 내릴 자리가 없으면 아래에 잠깐 여백을 붙인다 (팝업을 닫으면 걷는다)
+        document.body.style.paddingBottom = Math.ceil(122 + delta - room) + 'px';
+        mm.padded = true;
+      }
+      glide(() => window.scrollY, y => window.scrollTo(0, y), delta, () => {
+        if (meta !== mm) return;
+        pop.style.visibility = '';
+        placeMeta(mm);
+        popOpen(pop, null);
+      }, () => meta === mm);
     };
 
     document.addEventListener('click', e => {
@@ -5134,6 +5180,21 @@
     // 눌림 · 기울기가 있어도 가운데는 거의 그대로이므로, 가운데에 원래 크기를 놓는다
     const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2, w = el.offsetWidth, h = el.offsetHeight;
     return { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2, width: w, height: h };
+  }
+
+  // 정해진 거리만큼 부드럽게 스크롤하고, 다 끝나면 done 을 부른다 (alive 가 거짓이 되면 그 자리에서 멈춘다)
+  function glide(get, set, delta, done, alive) {
+    const y0 = get(), t0 = performance.now();
+    const dur = Math.max(280, Math.min(520, 240 + Math.abs(delta) * 0.6));
+    const ease = p => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+    const step = now => {
+      if (alive && !alive()) return;
+      const p = Math.min(1, (now - t0) / dur);
+      set(y0 + delta * ease(p));
+      if (p < 1) requestAnimationFrame(step);
+      else done();
+    };
+    requestAnimationFrame(step);
   }
 
   // ----- 카드 누르기: 누른 곳이 안으로 들어가듯 기울며 눌린다 -----
