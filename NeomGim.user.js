@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.18.7
+// @version      1.18.8
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.18.7';
+  const VERSION = '1.18.8';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -1235,6 +1235,27 @@
     html.hk-turning #comicImages, html.hk-turning #comicImages img,
     html.hk-turning #image-container, html.hk-turning #image-container img { visibility: hidden !important; }
     html.hk-zanim #mobileImages img { transition: transform .3s cubic-bezier(.22, 1, .36, 1) !important; }
+
+    /* 아직 받지 못한 페이지: 같은 크기의 자리표시 직사각형이 먼저 넘어오고, 이미지가 오면 그 위에 덮인다 */
+    .hk-ph { position: absolute; overflow: hidden; background: #1b1b1f; }
+    .hk-ph::after {
+      content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 60%;
+      background: linear-gradient(100deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0));
+      animation: hkSheen 1.5s ease-in-out infinite;
+    }
+    @keyframes hkSheen { to { transform: translateX(270%); } }
+    .hk-ring {
+      position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; z-index: 1;
+      opacity: 0; animation: hkRingIn .25s ease .18s forwards;
+    }
+    @keyframes hkRingIn { to { opacity: 1; } }
+    .hk-ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+    .hk-ring circle { fill: none; stroke-width: 3; stroke-linecap: round; }
+    .hk-ring .t { stroke: rgba(255, 255, 255, 0.14); }
+    .hk-ring .a { stroke: rgba(255, 255, 255, 0.9); stroke-dasharray: 100; stroke-dashoffset: 96; transition: stroke-dashoffset .25s ease; }
+    .hk-ring.ind svg { animation: hkSpin .9s linear infinite; }
+    .hk-ring.ind .a { stroke-dashoffset: 74; transition: none; }
+    @media (prefers-reduced-motion: reduce) { .hk-ph::after { animation: none; } }
     ` : ''}
   `;
 
@@ -2402,6 +2423,7 @@
   const preImg = new Map();
   const preSmall = new Map();
   const warmUrl = new Map();
+  const preProg = new Map(); // 페이지별 받은 정도 0~1 (크기를 모르면 -1)
   const pgReady = new Set();
   function markPgReady(id) {
     const key = String(id);
@@ -2463,8 +2485,26 @@
     };
 
     fetch(u, { signal: ctrl.signal, cache: 'force-cache' })
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+      .then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        // 조각조각 받으면서 얼마나 받았는지 적어 둔다 (자리표시 페이지의 동그라미가 읽는다)
+        const total = +r.headers.get('content-length') || 0;
+        if (!total || !r.body || !r.body.getReader) { preProg.set(idx, -1); return r.blob(); }
+        const rd = r.body.getReader();
+        const chunks = [];
+        let got = 0;
+        preProg.set(idx, 0);
+        const pump = () => rd.read().then(({ done, value }) => {
+          if (done) return new Blob(chunks, { type: r.headers.get('content-type') || '' });
+          chunks.push(value);
+          got += value.length;
+          preProg.set(idx, Math.min(1, got / total));
+          return pump();
+        });
+        return pump();
+      })
       .then(b => {
+        preProg.set(idx, 1);
         const blobUrl = URL.createObjectURL(b);
         return new Promise((resolve, reject) => {
           const im = new Image();
@@ -2481,6 +2521,7 @@
       .then(() => finish(true))
       .catch(err => {
         preBusy.delete(idx);
+        preProg.delete(idx);
         if (ctrl.signal.aborted) return;
         hlog('내려받기 실패', idx + 1, String(err));
         finish(false);
@@ -2534,6 +2575,7 @@
           preImg.delete(i);
           preSmall.delete(i);
           preDone.delete(i);
+          preProg.delete(i);
         }
       });
     }
@@ -2547,7 +2589,7 @@
         hlog('리더 미리 받기 시작 · 총', files.length, '장');
         tick(files);
         window.addEventListener('hashchange', () => tick(files));
-        setInterval(() => { tick(files); if (!isQuiet()) prepAround(); }, 500);
+        setInterval(() => { tick(files); if (!isQuiet()) { prepAround(); sweepLayers(); } }, 500);
       } else if (waited > 15000) {
         clearInterval(wait);
         hlog('리더 미리 받기 실패: galleryinfo 를 찾지 못함');
@@ -5516,7 +5558,124 @@
       'width:' + w + 'px!important;height:' + h + 'px!important;max-width:none!important;max-height:none!important;';
     layer.appendChild(im);
     layer._fresh = !reuse;
+    layer._info = { src, nw, nh };
     return layer;
+  }
+
+  // ----- 아직 받지 못한 페이지: 자리표시 직사각형 레이어 -----
+  // 작품 정보에 적힌 그 페이지의 가로·세로로 실제 이미지가 놓일 자리와 똑같은 크기의 상자를 만들고,
+  // 가운데에 받은 정도를 보여 주는 동그라미를 둔다. 이미지가 준비되면 fillLayer 가 그 위에 덮는다.
+  function phLayer(idx, files) {
+    const f = (files && files[idx]) || {};
+    const ref = shown || {};
+    const nw = +f.width || ref.nw || 1000, nh = +f.height || ref.nh || 1414;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const s = Math.min(vw / nw, vh / nh);
+    const w = nw * s, h = nh * s;
+    const layer = document.createElement('div');
+    layer.style.cssText = 'position:absolute!important;left:0!important;top:0!important;' +
+      'width:100%!important;height:100%!important;transform-origin:50% 50%;will-change:transform,opacity;';
+    const box = document.createElement('div');
+    box.className = 'hk-ph';
+    box.style.cssText = 'left:' + ((vw - w) / 2) + 'px;top:' + ((vh - h) / 2) + 'px;width:' + w + 'px;height:' + h + 'px;';
+    const ring = document.createElement('div');
+    ring.className = 'hk-ring ind';
+    ring.innerHTML = '<svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15" pathLength="100"/>' +
+      '<circle class="a" cx="18" cy="18" r="15" pathLength="100"/></svg>';
+    box.appendChild(ring);
+    layer.appendChild(box);
+    layer._ph = true;
+    layer._box = box;
+    // 받은 정도를 동그라미에 옮긴다 (이 레이어가 화면에 있는 동안만)
+    const arc = ring.querySelector('.a');
+    let last = '';
+    const paint = () => {
+      if (!layer._ph || !layer.isConnected) return;
+      const p = preDone.has(idx) ? 1 : preProg.get(idx);
+      const known = p != null && p >= 0;
+      const sig = known ? Math.round(p * 100) : 'i';
+      if (sig !== last) {
+        last = sig;
+        ring.classList.toggle('ind', !known);
+        if (known) arc.style.strokeDashoffset = String(100 - Math.max(4, Math.round(p * 100)));
+      }
+      requestAnimationFrame(paint);
+    };
+    requestAnimationFrame(paint);
+    return layer;
+  }
+
+  // 자리표시 레이어 위에 실제 이미지를 덮는다 (해독을 마친 뒤에 살며시 나타나고, 상자는 그 아래에서 사라진다)
+  function fillLayer(layer, info) {
+    if (!layer || !layer._ph) return;
+    layer._ph = false;
+    layer._info = info;
+    if (curLayer === layer) shown = info;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const s = Math.min(vw / (info.nw || 1), vh / (info.nh || 1));
+    const w = (info.nw || 1) * s, h = (info.nh || 1) * s;
+    const im = readyEl(info.src) || new Image();
+    im.alt = '';
+    im.className = 'hk-pg';
+    im.decoding = 'async';
+    if (im.src !== info.src) im.src = info.src;
+    im.style.cssText = 'position:absolute!important;display:block!important;margin:0!important;padding:0!important;' +
+      'left:' + ((vw - w) / 2) + 'px!important;top:' + ((vh - h) / 2) + 'px!important;' +
+      'width:' + w + 'px!important;height:' + h + 'px!important;max-width:none!important;max-height:none!important;opacity:0;';
+    let done = false;
+    const show = () => {
+      if (done) return;
+      done = true;
+      if (!layer.isConnected) return;
+      layer.appendChild(im);
+      const box = layer._box;
+      if (im.animate) {
+        const a = im.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: 'ease-out' });
+        im.style.opacity = '1';
+        if (box && box.animate) {
+          const b = box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: 'ease-in', fill: 'forwards' });
+          b.onfinish = () => box.remove();
+        } else if (box) box.remove();
+        void a;
+      } else {
+        im.style.opacity = '1';
+        if (box) box.remove();
+      }
+    };
+    (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(show);
+    setTimeout(show, 400);
+  }
+
+  // 자리표시 레이어의 이미지를 기다렸다가 덮는다. 끝내 못 받았고 그 페이지를 보고 있으면 사이트 화면으로 돌려준다
+  function fillWhenReady(layer, gid, files, idx, attrBefore) {
+    waitPage(gid, files, idx, 20000, attrBefore, () => layer.isConnected && layer._ph)
+      .then(info => fillLayer(layer, info))
+      .catch(() => {
+        if (curLayer === layer && layer._ph && layer.isConnected) { ++turnSeq; endChain(); }
+      });
+  }
+
+  // 넘기는 중이 아닐 때, 지금 쓰고 있지 않은 레이어가 남아 있으면 치운다 (렉으로 남은 페이지가 위를 덮지 않게)
+  function sweepLayers() {
+    if (!turnWrap || drag.mode === 2) return;
+    const keep = new Set([curLayer, holdLayer, drag.outL, drag.inL]);
+    leaving.forEach(l => keep.add(l));
+    prep.forEach(p => keep.add(p.layer));
+    Array.from(turnWrap.children).forEach(c => {
+      if (keep.has(c) || c.classList.contains('hk-spin')) return;
+      try { c.remove(); } catch (e) {}
+    });
+  }
+
+  // 작품을 열 때 띄운 첫 페이지 덮개가 아직 남아 있으면 넘기기 시작할 때 바로 치운다 (그 아래에서 넘어가지 않게)
+  function dropEntryZoom() {
+    document.querySelectorAll('.hk-zoom').forEach(z => {
+      if (z._hkGone) return;
+      z._hkGone = true;
+      z.style.transition = 'opacity .16s ease';
+      z.style.opacity = '0';
+      setTimeout(() => z.remove(), 180);
+    });
   }
 
   function coverUp() {
@@ -5603,6 +5762,7 @@
   }
 
   function endChain() {
+    ++turnSeq;
     prep.forEach((p, i) => dropPrep(i));
     holdLayer = null;
     clearTimeout(spinT);
@@ -5676,16 +5836,17 @@
   }
 
   // 미리 받은 파일이 먼저 준비되든, 사이트가 띄운 이미지가 먼저 준비되든 빠른 쪽을 쓴다
-  function waitPage(gid, files, idx, timeout, attrBefore) {
+  function waitPage(gid, files, idx, timeout, attrBefore, alive) {
     return new Promise((resolve, reject) => {
       const t0 = performance.now();
       const tryNow = () => {
+        if (alive && !alive()) { reject(new Error('gone')); return; }
         const im = preImg.get(idx);
         if (im && im.complete && im.naturalWidth) {
           resolve({ src: im.src, nw: im.naturalWidth, nh: im.naturalHeight });
           return;
         }
-        if (attrBefore !== undefined) {
+        if (attrBefore !== undefined && fxPage() - 1 === idx) {
           const r = findReaderImg();
           const a = r ? r.getAttribute('src') : null;
           if (r && a && a !== attrBefore && r.complete && r.naturalWidth) {
@@ -5773,6 +5934,7 @@
     const dir = dirHint || Math.sign(next - cur);
     if (!dir) return;
     busyFor(TURN_DUR + 120);
+    dropEntryZoom();
     if (zoom > 1.01) resetZoom();
     if (next < 1 || (total && next > total)) { edgeBounce(dir); return; }
 
@@ -5802,10 +5964,25 @@
     const attrBefore = realBefore ? realBefore.getAttribute('src') : null;
     markOwn(next);
     location.replace('#' + next);
-    pendingIn++;
-    syncActive();
 
     const now = files ? pageReady(next - 1) : null;
+    if (!now && files) {
+      // 다음 장이 아직이면 기다리지 않는다: 같은 크기의 자리표시가 바로 넘어오고, 이미지는 받는 대로 그 위에 덮인다
+      hideSpin();
+      const inL = phLayer(next - 1, files);
+      ensureWrap().appendChild(inL);
+      let ox = 0;
+      if (out && out.isConnected) { ox = poseOf(out).x; leave(out, side, W); }
+      slide(inL, ox - side * W, 0, inScale(dir), 1, 0, 1);
+      curLayer = inL;
+      shown = null;
+      fillWhenReady(inL, gid, files, next - 1, attrBefore);
+      setTimeout(prepAround, TURN_DUR + 60);
+      hlog('넘김', cur, '→', next, '(자리표시 · 받는 대로 덮음)');
+      return;
+    }
+    pendingIn++;
+    syncActive();
     // 다음 장이 아직이면 지금 장을 그 자리에 두고(빈 화면 없음) 받는 대로 넘긴다
     if (!now && out) { holdLayer = out; spinLater(my); }
     const readyP = now
@@ -5876,7 +6053,16 @@
   function dragAddIn() {
     if (drag.inL || !drag.files) return;
     const im = pageReady(drag.next - 1);
-    if (!im) return;
+    if (!im) {
+      if (drag.next - 1 >= drag.files.length) return;
+      drag.info = null;
+      drag.inL = phLayer(drag.next - 1, drag.files);
+      setPx(0);
+      coverUp();
+      ensureWrap().appendChild(drag.inL);
+      fillWhenReady(drag.inL, drag.gid, drag.files, drag.next - 1, drag.attr);
+      return;
+    }
     drag.info = { src: im.src, nw: im.naturalWidth, nh: im.naturalHeight };
     const pp = takePrep(drag.next - 1, drag.info.src);
     drag.inL = pp ? pp.layer : fitLayer(drag.info.src, drag.info.nw, drag.info.nh);
@@ -5902,6 +6088,9 @@
     const files = readerFiles(gid);
     ++turnSeq;
     hideSpin();
+    dropEntryZoom();
+    drag.gid = gid;
+    { const rb = findReaderImg(); drag.attr = rb ? rb.getAttribute('src') : null; }
     const base = curLayer || holdLayer;
     curLayer = null;
     holdLayer = null;
@@ -5948,7 +6137,9 @@
     if (il) {
       const p = poseOf(il);
       slide(il, p.x, -d * W, p.s, inScale(d), p.o, 0);
-      setTimeout(() => { try { il.remove(); } catch (e) {} }, TURN_DUR + 40);
+      leaving.add(il);
+      syncActive();
+      setTimeout(() => { try { il.remove(); } catch (e) {} leaving.delete(il); syncActive(); }, TURN_DUR + 40);
     }
     if (!ol) {
       setTimeout(() => {
@@ -5978,8 +6169,8 @@
       }, TURN_DUR + 40);
     }
     slide(il, pi.x, 0, pi.s, 1, pi.o, 1);
-    shown = drag.info;
     curLayer = il;
+    shown = il._ph ? null : (il._info || drag.info);
     setTimeout(prepAround, TURN_DUR + 60);
     press(0, 10);
   }
