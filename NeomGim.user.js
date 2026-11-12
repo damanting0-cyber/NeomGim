@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.18.8
+// @version      1.18.9
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.18.8';
+  const VERSION = '1.18.9';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -152,7 +152,7 @@
           background: rgba(28,28,32,.9); color: #f2f2f5; border: 1px solid rgba(255,255,255,.18);
           font: 600 12px/1.2 -apple-system, 'Malgun Gothic', sans-serif; opacity: .75; }
         button { transition: opacity .2s ease, transform .3s cubic-bezier(.22,1,.36,1); }
-        button:active { opacity: 1; transform: scale(.92); transition-duration: .1s; }
+        button:active, button.pr { opacity: 1; transform: scale(.92); transition-duration: .1s; }
       </style>
       <button>NeomGim 켜기</button>`;
     sh.querySelector('button').addEventListener('click', () => setEnabled(true));
@@ -532,7 +532,7 @@
       .info { padding: 10px 14px 12px 14px; }
       .title a { font-size: 14.5px; }
     }
-  `;
+  `.replace(/:active/g, ':is(:active, .pr)');
 
   const CARD_HTML = `
     <div class="card">
@@ -1115,6 +1115,7 @@
     .pvc { transition: transform .3s var(--ease); }
     .pvc:active { transform: scale(.95); transition-duration: .1s; }
     .pvc img, .pvc canvas { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .pvc { isolation: isolate; }
     .pvc.ok { outline: 1px solid rgba(159, 224, 168, 0.55); outline-offset: -1px; }
     .pvc.cur { outline: 2px solid #fff; outline-offset: -2px; }
     .pvn {
@@ -1159,7 +1160,9 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
-  `;
+  `.replace(/:active/g, ':is(:active, .pr)');
+  // 위의 :active 는 모두 '.pr'(손가락이 닿는 순간 붙이는 표시)에도 걸린다.
+  // 휴대폰 브라우저는 :active 를 늦게 켜거나 손가락을 움직여야 켜서, 누르는 순간 눌림이 보이지 않았다
 
   const FX_CSS = `
     #hk-fx-ov {
@@ -1244,17 +1247,14 @@
       animation: hkSheen 1.5s ease-in-out infinite;
     }
     @keyframes hkSheen { to { transform: translateX(270%); } }
-    .hk-ring {
-      position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; z-index: 1;
-      opacity: 0; animation: hkRingIn .25s ease .18s forwards;
+    .hk-pct {
+      position: absolute; left: 0; right: 0; top: 50%; margin-top: -11px; z-index: 1;
+      text-align: center; color: rgba(255, 255, 255, 0.72);
+      font: 600 15px/22px -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+      font-variant-numeric: tabular-nums; letter-spacing: .02em;
+      opacity: 0; animation: hkPctIn .25s ease .18s forwards;
     }
-    @keyframes hkRingIn { to { opacity: 1; } }
-    .hk-ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
-    .hk-ring circle { fill: none; stroke-width: 3; stroke-linecap: round; }
-    .hk-ring .t { stroke: rgba(255, 255, 255, 0.14); }
-    .hk-ring .a { stroke: rgba(255, 255, 255, 0.9); stroke-dasharray: 100; stroke-dashoffset: 96; transition: stroke-dashoffset .25s ease; }
-    .hk-ring.ind svg { animation: hkSpin .9s linear infinite; }
-    .hk-ring.ind .a { stroke-dashoffset: 74; transition: none; }
+    @keyframes hkPctIn { to { opacity: 1; } }
     @media (prefers-reduced-motion: reduce) { .hk-ph::after { animation: none; } }
     ` : ''}
   `;
@@ -2436,12 +2436,33 @@
   }
 
   // 1/N 창용 작은 그림: 창을 열었을 때만, 한 번에 몇 장씩 캔버스에 줄여 그린다
-  function smallCanvas(im) {
+  // 칸 크기(cw x ch, 화면 픽셀 배율까지)에 딱 맞게 가운데를 잘라 그린다.
+  // 한 번에 크게 줄이면 계단·물결무늬가 생기므로 절반씩 여러 번 줄인다 (예전엔 160px로 그려 늘려 보여서 깨져 보였다)
+  function smallCanvas(im, cw, ch) {
     try {
-      const w = 160, h = Math.max(1, Math.round(160 * im.naturalHeight / (im.naturalWidth || 1)));
+      const nw = im.naturalWidth || 1, nh = im.naturalHeight || 1;
+      const dpr = Math.min(3, window.devicePixelRatio || 1);
+      const W = Math.max(1, Math.round((cw || 120) * dpr)), H = Math.max(1, Math.round((ch || 160) * dpr));
+      const k = Math.max(W / nw, H / nh);
+      const sw = W / k, sh = H / k, sx = (nw - sw) / 2, sy = (nh - sh) / 2;
+      // 잘라낸 부분을 절반씩 줄여 목표 크기의 2배 이내로 만든다
+      let src = im, x = sx, y = sy, w = sw, h = sh;
+      while (w / 2 >= W && h / 2 >= H) {
+        const t = document.createElement('canvas');
+        t.width = Math.max(1, Math.round(w / 2));
+        t.height = Math.max(1, Math.round(h / 2));
+        const g = t.getContext('2d');
+        g.imageSmoothingEnabled = true;
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(src, x, y, w, h, 0, 0, t.width, t.height);
+        src = t; x = 0; y = 0; w = t.width; h = t.height;
+      }
       const c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      c.getContext('2d').drawImage(im, 0, 0, w, h);
+      c.width = W; c.height = H;
+      const g = c.getContext('2d');
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(src, x, y, w, h, 0, 0, W, H);
       return c;
     } catch (e) { return null; }
   }
@@ -4420,14 +4441,18 @@
         for (let i = 0; i < total; i++) grid.appendChild(pvCell(i));
       }
       let budget = 4;
+      const c0 = grid.children[0];
+      const cw = (c0 && c0.clientWidth) || 120, ch = (c0 && c0.clientHeight) || Math.round(cw * 4 / 3);
       for (let i = 0; i < total; i++) {
         const c = grid.children[i];
         const isCur = i + 1 === cur;
         let cv = preSmall.get(i) || null;
+        // 칸 크기가 바뀌었으면(화면 회전 등) 다시 그린다
+        if (cv && cv._w !== cw) { preSmall.delete(i); cv = null; }
         if (!cv && budget > 0 && preImg.has(i)) {
           budget--;
-          cv = smallCanvas(preImg.get(i));
-          if (cv) preSmall.set(i, cv);
+          cv = smallCanvas(preImg.get(i), cw, ch);
+          if (cv) { cv._w = cw; preSmall.set(i, cv); }
         }
         const u = cv ? '' : (isCur ? pvCurSrc() : '');
         const lab = (cv || u) ? '' : (preBusy.has(i) ? '받는 중' : (preImg.has(i) ? '준비 중' : '대기'));
@@ -4442,6 +4467,9 @@
         else if (u) {
           node = old && old.tagName === 'IMG' ? old : document.createElement('img');
           node.alt = '';
+          // 주소가 이미 버려진 이미지면 깨진 그림 대신 아무것도 보이지 않게
+          if (!node._hkErr) { node._hkErr = true; node.addEventListener('error', () => { node.style.visibility = 'hidden'; }); }
+          node.style.visibility = '';
           if (node.getAttribute('src') !== u) node.src = u;
         } else {
           node = old && old.classList && old.classList.contains('pvw') ? old : el('span', 'pvw');
@@ -5239,6 +5267,93 @@
     requestAnimationFrame(step);
   }
 
+  // ----- 버튼 누르기: 닿는 순간 눌림 표시(.pr)를 붙이고, 그 버튼이 든 큰 카드는 누른 쪽으로 얕게 기운다 -----
+  const PRESS_SEL = 'button, a.btn, .chip, .tog, .srow, .sg, .pvc, .sdiv, .copy, .pg, .item, .bkb, .grplist a';
+  // 큰 카드와 기우는 최대 각도(도). 클수록 얕게
+  const TILT_BOX = [['.bar', 4], ['.tl', 4], ['.ask', 4], ['.jfoot', 3], ['.cpop', 2.5], ['.panel', 2.5]];
+  const OUR_HOSTS = ['hk-host', 'hk-off'];
+  const isOurHost = n => n && n.nodeType === 1 && (OUR_HOSTS.indexOf(n.id) >= 0 ||
+    (n.classList && (n.classList.contains('hk-meta-host') || n.classList.contains('hk-card-host'))));
+
+  // 큰 카드 기울기: 원래 움직임(열리고 닫히는 애니메이션 등) 위에 '더해서' 기울이고, 가운데를 축으로 돈다
+  function tiltFx(el, px, py, deg) {
+    if (!el || !el.animate) return null;
+    const r = el.getBoundingClientRect();
+    const w = el.offsetWidth, h = el.offsetHeight;
+    if (!w || !h || !r.width) return null;
+    const clamp = v => Math.max(-1, Math.min(1, v));
+    const nx = clamp((px - (r.left + r.width / 2)) / (r.width / 2));
+    const ny = clamp((py - (r.top + r.height / 2)) / (r.height / 2));
+    const rx = -ny * deg, ry = nx * deg;
+    let ox = w / 2, oy = h / 2;
+    try {
+      const o = getComputedStyle(el).transformOrigin.split(' ');
+      ox = parseFloat(o[0]); oy = parseFloat(o[1]);
+      if (isNaN(ox) || isNaN(oy)) { ox = w / 2; oy = h / 2; }
+    } catch (e) {}
+    const dx = (w / 2 - ox).toFixed(1), dy = (h / 2 - oy).toFixed(1);
+    const persp = Math.round(Math.max(600, Math.max(w, h) * 2.5));
+    const pose = q => ({ transform: 'translate(' + dx + 'px,' + dy + 'px) perspective(' + persp + 'px) rotateX(' +
+      (rx * q).toFixed(3) + 'deg) rotateY(' + (ry * q).toFixed(3) + 'deg) translate(' + (-dx) + 'px,' + (-dy) + 'px)' });
+    el.getAnimations().forEach(x => { if (x.id === 'hk-tilt') x.cancel(); });
+    const D = 170, N = 12, ease = t => 1 - Math.pow(1 - t, 3);
+    const frames = [];
+    for (let i = 0; i < N; i++) frames.push(pose(ease(i / (N - 1))));
+    const run = (kf, opt) => {
+      let a;
+      try { a = el.animate(kf, Object.assign({ composite: 'add' }, opt)); } catch (e) { a = el.animate(kf, opt); }
+      a.id = 'hk-tilt';
+      return a;
+    };
+    const a = run(frames, { duration: D, easing: 'linear', fill: 'forwards' });
+    let done = false;
+    return {
+      release() {
+        if (done) return;
+        done = true;
+        const q0 = ease(Math.min(1, Math.max(0, (a.currentTime || 0) / D)));
+        a.cancel();
+        const qs = springKeys(q0, 0, 380, 24, 28);
+        qs[qs.length - 1] = 0;
+        run(qs.map(pose), { duration: Math.round(28 * 1000 / 60), easing: 'linear' });
+      }
+    };
+  }
+
+  const pressOn = [];
+  window.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const path = e.composedPath();
+    let pr = null, box = null, deg = 0, ours = false, inItem = false;
+    for (const n of path) {
+      if (!n || n.nodeType !== 1) continue;
+      if (isOurHost(n)) { ours = true; break; }
+      if (!pr && n.matches && n.matches(PRESS_SEL)) pr = n;
+      if (n.classList && n.classList.contains('item')) inItem = true;
+      if (!box && n.matches) {
+        const hit = TILT_BOX.find(([sel]) => n.matches(sel));
+        if (hit) { box = n; deg = hit[1]; }
+      }
+    }
+    if (!ours || !pr) return;
+    pr.classList.add('pr');
+    // 일지 카드처럼 스스로 기우는 카드를 누를 때는 큰 카드는 그대로 둔다
+    const tilt = box && !inItem ? tiltFx(box, e.clientX, e.clientY, deg) : null;
+    pressOn.push({ el: pr, t0: performance.now(), tilt, id: e.pointerId });
+  }, true);
+  const pressOff = e => {
+    for (let i = pressOn.length - 1; i >= 0; i--) {
+      const p = pressOn[i];
+      if (e && e.pointerId != null && p.id !== e.pointerId) continue;
+      pressOn.splice(i, 1);
+      // 아주 짧게 톡 눌러도 눌림이 보이도록 최소 90ms 는 눌린 채로 둔다
+      const left = Math.max(0, 90 - (performance.now() - p.t0));
+      setTimeout(() => { p.el.classList.remove('pr'); if (p.tilt) p.tilt.release(); }, left);
+    }
+  };
+  ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, pressOff, true));
+  window.addEventListener('blur', () => pressOff(null));
+
   // ----- 카드 누르기: 누른 곳이 안으로 들어가듯 기울며 눌린다 -----
   const P_DUR = 440;     // 바닥까지 눌리는 시간 (꾹 누르기가 될 즈음 바닥)
   const P_SCALE = 0.05;  // 가장 깊이 눌렸을 때 줄어드는 정도
@@ -5564,7 +5679,7 @@
 
   // ----- 아직 받지 못한 페이지: 자리표시 직사각형 레이어 -----
   // 작품 정보에 적힌 그 페이지의 가로·세로로 실제 이미지가 놓일 자리와 똑같은 크기의 상자를 만들고,
-  // 가운데에 받은 정도를 보여 주는 동그라미를 둔다. 이미지가 준비되면 fillLayer 가 그 위에 덮는다.
+  // 가운데에 받은 정도를 퍼센트로 보여 준다. 이미지가 준비되면 fillLayer 가 그 위에 덮는다.
   function phLayer(idx, files) {
     const f = (files && files[idx]) || {};
     const ref = shown || {};
@@ -5578,27 +5693,20 @@
     const box = document.createElement('div');
     box.className = 'hk-ph';
     box.style.cssText = 'left:' + ((vw - w) / 2) + 'px;top:' + ((vh - h) / 2) + 'px;width:' + w + 'px;height:' + h + 'px;';
-    const ring = document.createElement('div');
-    ring.className = 'hk-ring ind';
-    ring.innerHTML = '<svg viewBox="0 0 36 36"><circle class="t" cx="18" cy="18" r="15" pathLength="100"/>' +
-      '<circle class="a" cx="18" cy="18" r="15" pathLength="100"/></svg>';
-    box.appendChild(ring);
+    const pct = document.createElement('div');
+    pct.className = 'hk-pct';
+    pct.textContent = '받는 중';
+    box.appendChild(pct);
     layer.appendChild(box);
     layer._ph = true;
     layer._box = box;
-    // 받은 정도를 동그라미에 옮긴다 (이 레이어가 화면에 있는 동안만)
-    const arc = ring.querySelector('.a');
+    // 받은 정도를 퍼센트로 보여 준다 (이 레이어가 화면에 있는 동안만). 크기를 모르면 '받는 중'
     let last = '';
     const paint = () => {
       if (!layer._ph || !layer.isConnected) return;
       const p = preDone.has(idx) ? 1 : preProg.get(idx);
-      const known = p != null && p >= 0;
-      const sig = known ? Math.round(p * 100) : 'i';
-      if (sig !== last) {
-        last = sig;
-        ring.classList.toggle('ind', !known);
-        if (known) arc.style.strokeDashoffset = String(100 - Math.max(4, Math.round(p * 100)));
-      }
+      const t = p != null && p >= 0 ? Math.floor(p * 100) + '%' : '받는 중';
+      if (t !== last) { last = t; pct.textContent = t; }
       requestAnimationFrame(paint);
     };
     requestAnimationFrame(paint);
