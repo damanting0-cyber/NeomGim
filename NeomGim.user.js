@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.18.9
+// @version      1.18.10
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.18.9';
+  const VERSION = '1.18.10';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -1132,6 +1132,8 @@
     }
 
     .tog:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.7); outline-offset: 2px; }
+    /* 반투명 흐림 알약 안의 버튼은 따로 층을 만들어 둔다. 눌려 작아질 때 알약의 흐림 배경을 매 프레임 다시 그리지 않게 */
+    .bar .ib, .bar .cur, .bstar, .tl .ib, .tl .pg, .hfix, .filt { will-change: transform; backface-visibility: hidden; }
     /* 마우스를 쓸 때만: 올려놓으면 살짝 밝아진다 (터치 화면에는 적용되지 않는다) */
     @media (hover: hover) and (pointer: fine) {
       .ib:hover:not(.active) { background: rgba(255, 255, 255, 0.10); }
@@ -5267,88 +5269,39 @@
     requestAnimationFrame(step);
   }
 
-  // ----- 버튼 누르기: 닿는 순간 눌림 표시(.pr)를 붙이고, 그 버튼이 든 큰 카드는 누른 쪽으로 얕게 기운다 -----
+  // ----- 버튼 누르기: 손가락이 닿는 순간 눌림 표시(.pr)를 붙인다 -----
+  // 휴대폰 브라우저는 :active 를 늦게 켜거나 손가락을 움직여야 켜서, 누르는 순간 눌림이 보이지 않았다
   const PRESS_SEL = 'button, a.btn, .chip, .tog, .srow, .sg, .pvc, .sdiv, .copy, .pg, .item, .bkb, .grplist a';
-  // 큰 카드와 기우는 최대 각도(도). 클수록 얕게
-  const TILT_BOX = [['.bar', 4], ['.tl', 4], ['.ask', 4], ['.jfoot', 3], ['.cpop', 2.5], ['.panel', 2.5]];
-  const OUR_HOSTS = ['hk-host', 'hk-off'];
-  const isOurHost = n => n && n.nodeType === 1 && (OUR_HOSTS.indexOf(n.id) >= 0 ||
-    (n.classList && (n.classList.contains('hk-meta-host') || n.classList.contains('hk-card-host'))));
-
-  // 큰 카드 기울기: 원래 움직임(열리고 닫히는 애니메이션 등) 위에 '더해서' 기울이고, 가운데를 축으로 돈다
-  function tiltFx(el, px, py, deg) {
-    if (!el || !el.animate) return null;
-    const r = el.getBoundingClientRect();
-    const w = el.offsetWidth, h = el.offsetHeight;
-    if (!w || !h || !r.width) return null;
-    const clamp = v => Math.max(-1, Math.min(1, v));
-    const nx = clamp((px - (r.left + r.width / 2)) / (r.width / 2));
-    const ny = clamp((py - (r.top + r.height / 2)) / (r.height / 2));
-    const rx = -ny * deg, ry = nx * deg;
-    let ox = w / 2, oy = h / 2;
-    try {
-      const o = getComputedStyle(el).transformOrigin.split(' ');
-      ox = parseFloat(o[0]); oy = parseFloat(o[1]);
-      if (isNaN(ox) || isNaN(oy)) { ox = w / 2; oy = h / 2; }
-    } catch (e) {}
-    const dx = (w / 2 - ox).toFixed(1), dy = (h / 2 - oy).toFixed(1);
-    const persp = Math.round(Math.max(600, Math.max(w, h) * 2.5));
-    const pose = q => ({ transform: 'translate(' + dx + 'px,' + dy + 'px) perspective(' + persp + 'px) rotateX(' +
-      (rx * q).toFixed(3) + 'deg) rotateY(' + (ry * q).toFixed(3) + 'deg) translate(' + (-dx) + 'px,' + (-dy) + 'px)' });
-    el.getAnimations().forEach(x => { if (x.id === 'hk-tilt') x.cancel(); });
-    const D = 170, N = 12, ease = t => 1 - Math.pow(1 - t, 3);
-    const frames = [];
-    for (let i = 0; i < N; i++) frames.push(pose(ease(i / (N - 1))));
-    const run = (kf, opt) => {
-      let a;
-      try { a = el.animate(kf, Object.assign({ composite: 'add' }, opt)); } catch (e) { a = el.animate(kf, opt); }
-      a.id = 'hk-tilt';
-      return a;
-    };
-    const a = run(frames, { duration: D, easing: 'linear', fill: 'forwards' });
-    let done = false;
-    return {
-      release() {
-        if (done) return;
-        done = true;
-        const q0 = ease(Math.min(1, Math.max(0, (a.currentTime || 0) / D)));
-        a.cancel();
-        const qs = springKeys(q0, 0, 380, 24, 28);
-        qs[qs.length - 1] = 0;
-        run(qs.map(pose), { duration: Math.round(28 * 1000 / 60), easing: 'linear' });
-      }
-    };
-  }
+  const isOurHost = n => n.id === 'hk-host' || n.id === 'hk-off' ||
+    n.classList.contains('hk-meta-host') || n.classList.contains('hk-card-host');
 
   const pressOn = [];
   window.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const path = e.composedPath();
-    let pr = null, box = null, deg = 0, ours = false, inItem = false;
-    for (const n of path) {
+    let pr = null;
+    // 이 스크립트가 만든 화면(그림자 안) 안에서, 가장 안쪽의 누를 수 있는 것 하나만 찾는다
+    for (let i = 0; i < path.length; i++) {
+      const n = path[i];
       if (!n || n.nodeType !== 1) continue;
-      if (isOurHost(n)) { ours = true; break; }
-      if (!pr && n.matches && n.matches(PRESS_SEL)) pr = n;
-      if (n.classList && n.classList.contains('item')) inItem = true;
-      if (!box && n.matches) {
-        const hit = TILT_BOX.find(([sel]) => n.matches(sel));
-        if (hit) { box = n; deg = hit[1]; }
+      if (isOurHost(n)) {
+        if (!pr) return;
+        pr.classList.add('pr');
+        pressOn.push({ el: pr, t0: performance.now(), id: e.pointerId });
+        return;
       }
+      if (!pr && n.matches(PRESS_SEL)) pr = n;
     }
-    if (!ours || !pr) return;
-    pr.classList.add('pr');
-    // 일지 카드처럼 스스로 기우는 카드를 누를 때는 큰 카드는 그대로 둔다
-    const tilt = box && !inItem ? tiltFx(box, e.clientX, e.clientY, deg) : null;
-    pressOn.push({ el: pr, t0: performance.now(), tilt, id: e.pointerId });
   }, true);
   const pressOff = e => {
     for (let i = pressOn.length - 1; i >= 0; i--) {
       const p = pressOn[i];
-      if (e && e.pointerId != null && p.id !== e.pointerId) continue;
+      if (e && p.id !== e.pointerId) continue;
       pressOn.splice(i, 1);
       // 아주 짧게 톡 눌러도 눌림이 보이도록 최소 90ms 는 눌린 채로 둔다
-      const left = Math.max(0, 90 - (performance.now() - p.t0));
-      setTimeout(() => { p.el.classList.remove('pr'); if (p.tilt) p.tilt.release(); }, left);
+      const left = 90 - (performance.now() - p.t0);
+      if (left > 0) setTimeout(() => p.el.classList.remove('pr'), left);
+      else p.el.classList.remove('pr');
     }
   };
   ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, pressOff, true));
