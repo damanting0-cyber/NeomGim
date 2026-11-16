@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.20.0
+// @version      1.21.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.20.0';
+  const VERSION = '1.21.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -1294,6 +1294,33 @@
       .ib { width: 36px; height: 36px; }
       .tl .ib { width: 30px; height: 30px; }
     }
+    /* ----- 하단 버튼들: 원래 크기의 60% ----- */
+    .wrap { gap: 7px; }
+    .wrap .bottom { gap: 6px; }
+    .wrap .tl { height: 26px; padding: 0 3px; gap: 1px; }
+    .wrap .tl .pg { padding: 0 7px 0 8px; font-size: 8px; }
+    .wrap .tl .ib { width: 20px; height: 20px; }
+    .wrap .tl .ib svg { width: 10px; height: 10px; }
+    .wrap .bar { height: 31px; padding: 0 4px; gap: 1px; }
+    .wrap .bar .ib { width: 24px; height: 24px; }
+    .wrap .bar .ib svg { width: 11px; height: 11px; }
+    .wrap .cur { padding: 0 2px 0 10px; font-size: 9px; }
+    .wrap .bstar { width: 13px; height: 24px; }
+    .wrap .bstar svg { width: 11px; height: 11px; }
+    .wrap .filt { height: 31px; padding: 0 10px 0 9px; gap: 4px; font-size: 7.5px; }
+    .wrap .filt svg { width: 10px; height: 10px; }
+    .wrap .hfix { width: 26px; height: 26px; }
+    .wrap .hh { font-size: 9px; }
+    @media (max-width: 520px) {
+      .wrap { gap: 6px; }
+      .wrap .tl { height: 24px; }
+      .wrap .tl .ib { width: 18px; height: 18px; }
+      .wrap .bar, .wrap .filt { height: 29px; }
+      .wrap .bar .ib { width: 22px; height: 22px; }
+      .wrap .cur { font-size: 8.5px; padding-left: 7px; }
+      .wrap .bstar { width: 11px; height: 22px; }
+      .wrap .bstar svg { width: 10px; height: 10px; }
+    }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
@@ -2532,7 +2559,12 @@
             im.onerror = () => { URL.revokeObjectURL(bu); rej(new Error('decode')); };
             im.src = bu;
           }))
-          .catch(err => { hlog('홈 미리 받기 실패', id, u, String(err && err.message || err)); });
+          .catch(() => new Promise(res => {
+            const im = new Image();
+            im.onload = () => { markPgReady(id); res(); };
+            im.onerror = () => res();
+            im.src = u;
+          }));
       })
       .catch(() => {});
   }
@@ -2604,6 +2636,34 @@
     } catch (e) { return null; }
   }
 
+  // 아이폰 Userscripts 처럼 스크립트가 사이트와 분리된 곳에서 돌면 사이트의 이미지 주소 함수를 직접 못 부른다.
+  // 사이트 안에 작은 코드를 심어 두고, 문서 속성으로 물어보고 답을 받는다 (이벤트는 그 자리에서 바로 처리된다)
+  let urlBridge = false;
+  function pageImgUrl(gid, f, dir, ext) {
+    const de = document.documentElement;
+    if (!de) return '';
+    try {
+      if (!urlBridge) {
+        urlBridge = true;
+        const sc = document.createElement('script');
+        sc.textContent = '(function(){document.addEventListener("hk-url-req",function(){var de=document.documentElement,u="";' +
+          'try{var q=JSON.parse(de.getAttribute("data-hk-url-q"));' +
+          'if(typeof url_from_url_from_hash==="function")u=url_from_url_from_hash(q.gid,q.f,q.dir,q.ext)||""}catch(e){u=""}' +
+          'de.setAttribute("data-hk-url-a",u)})})();';
+        (document.head || de).appendChild(sc);
+        sc.remove();
+      }
+      de.setAttribute('data-hk-url-q', JSON.stringify({ gid: String(gid), dir, ext,
+        f: { hash: f.hash, name: f.name, haswebp: f.haswebp, hasavif: f.hasavif, width: f.width, height: f.height } }));
+      de.removeAttribute('data-hk-url-a');
+      document.dispatchEvent(new CustomEvent('hk-url-req'));
+      const a = de.getAttribute('data-hk-url-a') || '';
+      de.removeAttribute('data-hk-url-q');
+      de.removeAttribute('data-hk-url-a');
+      return (a && a.indexOf('undefined') < 0) ? a : '';
+    } catch (e) { return ''; }
+  }
+
   function readerImgUrl(gid, f) {
     const w = W();
     const webp = f.haswebp == 1 || f.haswebp === '1';
@@ -2614,6 +2674,9 @@
       if (typeof w.url_from_url_from_hash === 'function') {
         const u = w.url_from_url_from_hash(gid, f, dir, ext);
         if (typeof u === 'string' && u && u.indexOf('undefined') < 0) return u;
+      } else {
+        const u = pageImgUrl(gid, f, dir, ext);
+        if (u) return u;
       }
     } catch (e) {}
     return hkImageUrl(f);
@@ -2678,11 +2741,22 @@
       })
       .then(() => finish(true))
       .catch(err => {
-        preBusy.delete(idx);
-        preProg.delete(idx);
-        if (ctrl.signal.aborted) return;
-        hlog('내려받기 실패', idx + 1, String(err));
-        finish(false);
+        if (ctrl.signal.aborted) { preBusy.delete(idx); preProg.delete(idx); return; }
+        hlog('내려받기 실패, 그림으로 다시', idx + 1, String(err));
+        preProg.set(idx, -1);
+        const im = new Image();
+        im.decoding = 'async';
+        im.onload = () => {
+          if (ctrl.signal.aborted) { preBusy.delete(idx); preProg.delete(idx); return; }
+          if (im.decode) im.decode().catch(() => {});
+          preProg.set(idx, 1);
+          preBlob.set(idx, u);
+          preImg.set(idx, im);
+          finish(true);
+        };
+        im.onerror = () => { preProg.delete(idx); finish(false); };
+        ctrl.signal.addEventListener('abort', () => { im.onload = im.onerror = null; im.src = ''; });
+        im.src = u;
       });
   }
 
