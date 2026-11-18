@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.22.0
+// @version      1.23.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.22.0';
+  const VERSION = '1.23.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -1294,33 +1294,6 @@
       .ib { width: 36px; height: 36px; }
       .tl .ib { width: 30px; height: 30px; }
     }
-    /* ----- 하단 버튼들: 원래 크기의 72% ----- */
-    .wrap { gap: 9px; }
-    .wrap .bottom { gap: 7px; }
-    .wrap .tl { height: 32px; padding: 0 4px; gap: 1px; }
-    .wrap .tl .pg { padding: 0 9px 0 10px; font-size: 9.5px; }
-    .wrap .tl .ib { width: 24px; height: 24px; }
-    .wrap .tl .ib svg { width: 12px; height: 12px; }
-    .wrap .bar { height: 37px; padding: 0 4px; gap: 1px; }
-    .wrap .bar .ib { width: 29px; height: 29px; }
-    .wrap .bar .ib svg { width: 14px; height: 14px; }
-    .wrap .cur { padding: 0 3px 0 12px; font-size: 11px; }
-    .wrap .bstar { width: 16px; height: 29px; }
-    .wrap .bstar svg { width: 13px; height: 13px; }
-    .wrap .filt { height: 37px; padding: 0 12px 0 11px; gap: 5px; font-size: 9px; }
-    .wrap .filt svg { width: 12px; height: 12px; }
-    .wrap .hfix { width: 32px; height: 32px; }
-    .wrap .hh { font-size: 11px; }
-    @media (max-width: 520px) {
-      .wrap { gap: 7px; }
-      .wrap .tl { height: 29px; }
-      .wrap .tl .ib { width: 22px; height: 22px; }
-      .wrap .bar, .wrap .filt { height: 35px; }
-      .wrap .bar .ib { width: 26px; height: 26px; }
-      .wrap .cur { font-size: 10px; padding-left: 9px; }
-      .wrap .bstar { width: 14px; height: 26px; }
-      .wrap .bstar svg { width: 12px; height: 12px; }
-    }
     /* ----- 검색: 태그 버튼과 고른 태그 ----- */
     .stags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .stags:empty { display: none; }
@@ -1330,6 +1303,22 @@
     .ssel .chip .cx { margin-left: 6px; width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
       font-size: 9px; background: rgba(255, 255, 255, 0.18); }
     .sadd .chip::before { content: '+'; margin-right: 4px; font-weight: 800; opacity: .8; }
+    .sadd .chip.tagx::before { content: '#'; }
+    .sadd .chip.tagx.on { background: rgba(255, 255, 255, 0.9); color: #111; border-color: transparent; }
+    .sexp { margin-top: 8px; }
+    .sexp:empty { display: none; }
+    .sexp .lets { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    .sexp .lets::-webkit-scrollbar { display: none; }
+    .sexp .let { flex: none; min-width: 30px; height: 30px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.08); color: #fff; font: inherit; font-size: 12px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+    .sexp .let.on { background: #fff; color: #111; border-color: transparent; }
+    .sexp .seg { margin: 4px 0 8px; }
+    .sexp .stags { margin-top: 0; }
+    .sexp .chip .k { margin-left: 5px; font-size: 10px; opacity: .6; font-variant-numeric: tabular-nums; }
+    .sexp .more { margin-top: 8px; }
+    .sexp .chip.picked { background: #fff; color: #111; border-color: transparent; }
+    .sexp .chip.picked .tn, .sexp .chip.picked .k { color: #111; }
+    .sexp .chip.picked::before { content: '✓'; margin-right: 4px; font-weight: 800; }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
@@ -3325,6 +3314,8 @@
     let bmSetStars = null;
     let sItems = [], sIdx = -1;
     let sTags = [];
+    let sExp = false, sExpLet = 'a', sExpTy = 'all', sExpN = 120;
+    const allTagCache = new Map();
     let sInput = null;
     let sgSeq = 0;
     let bmId = null;
@@ -3596,10 +3587,120 @@
       paintSel();
       renderSgs(sInput ? sInput.value : '');
     }
+    // 태그 둘러보기: 히토미의 '모든 태그' 페이지(알파벳별)를 받아 많이 쓰인 순으로 보여 준다
+    function loadAllTags(letter) {
+      if (allTagCache.has(letter)) return Promise.resolve(allTagCache.get(letter));
+      return fetch('/alltags-' + letter + '.html', { credentials: 'same-origin' })
+        .then(r => (r.ok ? r.text() : ''))
+        .then(html => {
+          const out = [], seen = new Set();
+          const re = /href="\/tag\/([^"]+?)-all\.html"[^>]*>([\s\S]*?)<\/a>([^<]{0,40})/g;
+          let m;
+          while ((m = re.exec(html))) {
+            let raw = '';
+            try { raw = decodeURIComponent(m[1]); } catch (e) { continue; }
+            raw = raw.trim();
+            if (!raw || seen.has(raw)) continue;
+            seen.add(raw);
+            const i = raw.indexOf(':');
+            const ty = i > 0 ? raw.slice(0, i) : 'tag';
+            const name = i > 0 ? raw.slice(i + 1) : raw;
+            const cm = (m[3] || '').replace(/,/g, '').match(/\d+/);
+            out.push({ t: name, ty, c: cm ? +cm[0] : 0, tag: (i > 0 ? ty + ':' : '') + name.replace(/ /g, '_') });
+          }
+          if (out.some(x => x.c)) out.sort((x, y) => y.c - x.c);
+          return out;
+        })
+        .catch(() => [])
+        .then(list => {
+          if (list.length) { allTagCache.set(letter, list); return list; }
+          // 페이지를 못 읽으면 자동완성에서 그 글자로 시작하는 태그를 받는다
+          return tagSuggest(letter === '123' ? '1' : letter).then(xs => xs.map(x => ({
+            t: x.t, ty: x.ty || 'tag', c: x.c,
+            tag: (x.ty && x.ty !== 'tag' ? x.ty + ':' : '') + x.t.replace(/ /g, '_')
+          })));
+        });
+    }
+    let expSeq = 0;
+    function paintExplore() {
+      const box = panel.querySelector('#sexp');
+      if (!box) return;
+      box.textContent = '';
+      if (!sExp || (sInput && sInput.value.trim())) return;
+      const lets = el('div', 'lets');
+      'abcdefghijklmnopqrstuvwxyz'.split('').concat(['123']).forEach(L => {
+        const b = el('button', 'let' + (L === sExpLet ? ' on' : ''), L === '123' ? '0-9' : L);
+        b.type = 'button';
+        b.addEventListener('mousedown', e => e.preventDefault());
+        b.addEventListener('click', () => { haptic(); sExpLet = L; sExpN = 120; paintExplore(); });
+        lets.appendChild(b);
+      });
+      box.appendChild(lets);
+      requestAnimationFrame(() => {
+        const on = lets.querySelector('.on');
+        if (on) lets.scrollLeft = Math.max(0, on.offsetLeft - lets.clientWidth / 2 + on.offsetWidth / 2);
+      });
+      box.appendChild(segCtl([['all', '전체'], ['female', '♀'], ['male', '♂'], ['tag', '기타']], sExpTy, k => {
+        sExpTy = k; sExpN = 120; paintExpList();
+      }));
+      const list = el('div', 'stags');
+      list.id = 'sexpl';
+      box.appendChild(list);
+      paintExpList();
+    }
+    function paintExpList() {
+      const list = panel.querySelector('#sexpl');
+      if (!list) return;
+      const my = ++expSeq;
+      list.textContent = '';
+      list.appendChild(el('div', 'muted', '불러오는 중…'));
+      loadAllTags(sExpLet).then(all => {
+        if (my !== expSeq || !list.isConnected) return;
+        list.textContent = '';
+        const want = all.filter(x => sExpTy === 'all' ? true
+          : sExpTy === 'tag' ? (x.ty !== 'female' && x.ty !== 'male') : x.ty === sExpTy);
+        if (!want.length) { list.appendChild(el('div', 'muted', '태그를 불러오지 못했어요')); return; }
+        want.slice(0, sExpN).forEach(x => {
+          const b = chipBtn(tagCls(x.ty), x.ty, x.t, false);
+          if (sTags.indexOf(x.tag) >= 0) b.classList.add('picked');
+          if (x.c) b.appendChild(el('span', 'k', nfmt(x.c)));
+          b.title = '검색 필터에 추가';
+          b.addEventListener('click', () => {
+            haptic();
+            if (sTags.indexOf(x.tag) < 0) sTags.push(x.tag);
+            else sTags = sTags.filter(t => t !== x.tag);
+            b.classList.toggle('picked', sTags.indexOf(x.tag) >= 0);
+            paintSel();
+          });
+          list.appendChild(b);
+        });
+        if (want.length > sExpN) {
+          const more = btn('더 보기 (' + (want.length - sExpN) + ')', 'more', () => { sExpN += 200; paintExpList(); });
+          list.appendChild(more);
+        }
+      });
+    }
+
     function paintTagBtns(items) {
       const box = panel.querySelector('#sadd');
       if (!box) return;
       box.textContent = '';
+      if (!sInput || !sInput.value.trim()) {
+        const b = el('button', 'chip tagx' + (sExp ? ' on' : ''), '태그');
+        b.type = 'button';
+        b.title = '태그 둘러보기';
+        b.addEventListener('mousedown', e => e.preventDefault());
+        b.addEventListener('click', () => {
+          haptic();
+          sExp = !sExp;
+          b.classList.toggle('on', sExp);
+          paintExplore();
+        });
+        box.appendChild(b);
+        paintExplore();
+        return;
+      }
+      paintExplore();
       items.filter(it => it.tag && sTags.indexOf(it.tag) < 0).slice(0, 12).forEach(it => {
         const b = chipBtn(tagCls(it.ty), it.ty, it.t, it.tag[0] === '-');
         b.title = '검색 필터에 추가';
@@ -3731,9 +3832,11 @@
       sel.id = 'ssel';
       const add = el('div', 'stags sadd');
       add.id = 'sadd';
+      const exp = el('div', 'sexp');
+      exp.id = 'sexp';
       const list = el('div', 'sgl');
       list.id = 'sgl';
-      panel.append(r, sel, add, list);
+      panel.append(r, sel, add, exp, list);
       paintSel();
       renderSgs('');
     }
