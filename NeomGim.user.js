@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.23.0
+// @version      1.24.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.23.0';
+  const VERSION = '1.24.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -833,6 +833,7 @@
     }
     .toast .tact:active { transform: scale(.9); transition-duration: .1s; }
     .panel.mini { width: auto; min-width: 220px; padding: 14px 16px; }
+    .panel.sortp { width: 180px; }
     .panel.mini .val { margin-bottom: 10px; }
 
     .panel.hist { display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 0; }
@@ -1657,8 +1658,33 @@
   ];
   const SORT_KR = { date: '최신', today: '일간 인기', week: '주간 인기', month: '월간 인기', year: '연간 인기' };
 
+  // 검색 결과 정렬: 검색어에 orderby:popular orderbykey:(today|week|month|year) 를 붙인다
+  function searchQueryOf(search) {
+    let sp = String(search || '').replace(/^\?/, '');
+    if (/^query=/.test(sp)) sp = sp.slice(6);
+    sp = sp.split('#')[0].split('&')[0];
+    try { return decodeURIComponent(sp.replace(/\+/g, ' ')); } catch (e) { return sp; }
+  }
+  function sortOfQuery(q) {
+    const toks = String(q || '').toLowerCase().split(/\s+/);
+    if (toks.indexOf('orderby:popular') < 0) return 'date';
+    const k = toks.find(t => /^orderbykey:/.test(t));
+    const v = k ? k.slice(11) : 'today';
+    return ['today', 'week', 'month', 'year'].indexOf(v) >= 0 ? v : 'today';
+  }
+  function sortUrl(key) {
+    if (location.pathname !== '/search.html') {
+      const hit = SORTS.find(x => x[0] === key);
+      return hit ? hit[1] : SORTS[0][1];
+    }
+    const toks = searchQueryOf(location.search).split(/\s+/).filter(t => t && !/^orderby(key|direction)?:/i.test(t));
+    if (key !== 'date') toks.push('orderby:popular', 'orderbykey:' + key);
+    return '/search.html?query=' + encodeURIComponent(toks.join(' '));
+  }
+
   function currentSort() {
     const p = location.pathname;
+    if (p === '/search.html') return sortOfQuery(searchQueryOf(location.search));
     const m = p.match(/^\/popular\/(today|week|month|year)-/);
     if (m) return m[1];
     if (p === '/' || /^\/index-/.test(p)) return 'date';
@@ -2868,7 +2894,59 @@
     list.forEach(x => { if (x && x.getAnimations) x.getAnimations().forEach(a => a.cancel()); });
   }
 
-  function popOpen(e, g) {
+  // 버튼에서 피어나는 팝업 (iOS 처럼): 팝업의 네 변이 버튼 자리에서 출발해 제자리로 퍼진다.
+  // 버튼에 가까운 변은 빨리, 먼 변은 천천히 도착해서 모양이 버튼 쪽에서 늘어나듯 보인다.
+  function bloomGeom(e, from) {
+    const r = e.getBoundingClientRect(), b = from.getBoundingClientRect();
+    if (!r.width || !r.height || !b.width) return null;
+    // 버튼을 팝업 안쪽 가장 가까운 자리로 옮겨 시작 사각형으로 쓴다
+    const bw = Math.min(b.width, r.width), bh = Math.min(b.height, r.height);
+    const cx = Math.max(r.left + bw / 2, Math.min(r.right - bw / 2, b.left + b.width / 2));
+    const cy = Math.max(r.top + bh / 2, Math.min(r.bottom - bh / 2, b.top + b.height / 2));
+    const st = { t: cy - bh / 2 - r.top, l: cx - bw / 2 - r.left, b: r.bottom - (cy + bh / 2), rr: r.right - (cx + bw / 2) };
+    // 변마다 버튼(실제 위치)에서의 거리 → 거리가 멀수록 오래 걸린다
+    const bx = b.left + b.width / 2, by = b.top + b.height / 2;
+    const dist = { t: Math.abs(by - r.top), b: Math.abs(by - r.bottom), l: Math.abs(bx - r.left), rr: Math.abs(bx - r.right) };
+    const rad0 = Math.min(bw, bh) / 2;
+    const rad1 = parseFloat(getComputedStyle(e).borderTopLeftRadius) || 26;
+    return { st, dist, rad0, rad1, dx: b.left + b.width / 2 - (r.left + r.width / 2), dy: by - (r.top + r.height / 2) };
+  }
+  // 임계 감쇠에 가까운 스프링 진행도 (0 → 1, 아주 살짝 넘침)
+  const springP = (t, T) => {
+    if (t >= T) return 1;
+    const w = 7.2 / T, z = 0.86, wd = w * Math.sqrt(1 - z * z);
+    return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t));
+  };
+  function bloomFrames(G, closing) {
+    const T = {};
+    let D = 0;
+    ['t', 'b', 'l', 'rr'].forEach(k => {
+      T[k] = closing ? 190 + G.dist[k] * 0.35 : 300 + G.dist[k] * 0.75;
+      T[k] = Math.min(T[k], closing ? 360 : 680);
+      D = Math.max(D, T[k]);
+    });
+    const N = 40, out = [];
+    for (let i = 0; i < N; i++) {
+      const t = D * i / (N - 1);
+      const P = {};
+      ['t', 'b', 'l', 'rr'].forEach(k => {
+        P[k] = closing ? 1 - Math.min(1, t / T[k]) * Math.min(1, t / T[k]) * (3 - 2 * Math.min(1, t / T[k])) : springP(t, T[k]);
+      });
+      const avg = (P.t + P.b + P.l + P.rr) / 4;
+      const ins = k => (G.st[k] * (1 - P[k])).toFixed(1) + 'px';
+      const rad = (G.rad0 + (G.rad1 - G.rad0) * Math.max(0, Math.min(1, avg))).toFixed(1);
+      const last = !closing && i === N - 1;
+      out.push({
+        clipPath: last ? 'inset(0px 0px 0px 0px round ' + G.rad1 + 'px)'
+          : `inset(${ins('t')} ${ins('rr')} ${ins('b')} ${ins('l')} round ${rad}px)`,
+        transform: last ? 'none' : `translate(${(G.dx * (1 - avg) * 0.08).toFixed(2)}px, ${(G.dy * (1 - avg) * 0.08).toFixed(2)}px)`,
+        opacity: closing ? Math.max(0, Math.min(1, avg * 1.6)).toFixed(3) : Math.min(1, 0.35 + avg * 1.2).toFixed(3)
+      });
+    }
+    return { frames: out, dur: D };
+  }
+
+  function popOpen(e, g, from) {
     clearTimeout(e._t);
     clearAnims([e, g]);
     e.classList.remove('out');
@@ -2883,11 +2961,21 @@
       g.classList.add('on');
     }
     if (!e.animate) return;
+    const G = (from && from.isConnected && !REDUCED_MOTION()) ? bloomGeom(e, from) : null;
+    if (G) {
+      const f = bloomFrames(G, false);
+      e.animate(f.frames, { duration: f.dur, easing: 'linear' });
+      if (g && g.animate) g.animate(f.frames, { duration: f.dur, easing: 'linear' });
+      return;
+    }
     e.animate(popFrames(), { duration: 600, easing: 'linear' });
     if (g && g.animate) g.animate(popFrames(), { duration: 600, easing: 'linear' });
   }
+  function REDUCED_MOTION() {
+    try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  }
 
-  function popClose(e, g, after) {
+  function popClose(e, g, after, to) {
     if (!e.classList.contains('open') || e.classList.contains('out')) return;
     e.classList.add('out');
     clearTimeout(e._t);
@@ -2899,6 +2987,14 @@
       if (after) after();
     };
     if (!e.animate) { e._t = setTimeout(finish, 230); return; }
+    const G = (to && to.isConnected && !REDUCED_MOTION()) ? bloomGeom(e, to) : null;
+    if (G) {
+      const f = bloomFrames(G, true);
+      const a = e.animate(f.frames, { duration: f.dur, easing: 'linear', fill: 'forwards' });
+      if (g && g.animate) g.animate(f.frames, { duration: f.dur, easing: 'linear', fill: 'forwards' });
+      a.onfinish = finish;
+      return;
+    }
     const a = e.animate(closeFrames(), { duration: 500, easing: 'linear', fill: 'forwards' });
     a.onfinish = finish;
   }
@@ -3190,6 +3286,7 @@
       const pm = path.match(/^\/popular\/(today|week|month|year)-/);
       if (pm) sort = pm[1];
       else if (path === '/' || /^\/index-/.test(path)) sort = 'date';
+      else if (path === '/search.html') sort = sortOfQuery(searchQueryOf(u.search));
       return { id: m ? m[1] : null, work, reader, sort };
     }
     function frag(html) {
@@ -4568,10 +4665,10 @@
       panel.appendChild(el('div', 'lbl', '정렬'));
       const list = el('div', 'slist');
       const cur = currentSort();
-      SORTS.forEach(([key, url]) => {
+      SORTS.forEach(([key]) => {
         const b = el('button', 'srow' + (key === cur ? ' on' : ''), SORT_KR[key] || key);
         b.type = 'button';
-        b.addEventListener('click', () => fxGo(url));
+        b.addEventListener('click', () => fxGo(sortUrl(key)));
         list.appendChild(b);
       });
       panel.appendChild(list);
@@ -5248,9 +5345,9 @@
           if (my !== swapSeq) return;
           resetPanelStyle();
           if (!panelMode) panel.textContent = '';
-          panel.classList.remove('top', 'hist');
+          panel.classList.remove('top', 'hist', 'sortp');
           syncKeyboard();
-        });
+        }, btnFor[prev] ? $(btnFor[prev]) : null);
       }
       root.classList.toggle('pop', !!panelMode);
     }
@@ -5260,13 +5357,14 @@
       RENDERERS[mode]();
       panel.classList.toggle('mini', mode === 'home');
       panel.classList.toggle('hist', mode === 'hist');
+      panel.classList.toggle('sortp', mode === 'sort');
       syncKeyboard();
     }
 
     function showPanel(mode) {
       resetPanelStyle();
       paintMode(mode);
-      popOpen(panel, glass);
+      popOpen(panel, glass, btnFor[mode] ? $(btnFor[mode]) : null);
     }
 
     // 열린 팝업 안에서 화면 전환: 기존 요소가 사라지고 → 높이가 바뀌면서 → 새 요소가 바로 나타난다
