@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.21.0
+// @version      1.22.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.21.0';
+  const VERSION = '1.22.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -1294,33 +1294,42 @@
       .ib { width: 36px; height: 36px; }
       .tl .ib { width: 30px; height: 30px; }
     }
-    /* ----- 하단 버튼들: 원래 크기의 60% ----- */
-    .wrap { gap: 7px; }
-    .wrap .bottom { gap: 6px; }
-    .wrap .tl { height: 26px; padding: 0 3px; gap: 1px; }
-    .wrap .tl .pg { padding: 0 7px 0 8px; font-size: 8px; }
-    .wrap .tl .ib { width: 20px; height: 20px; }
-    .wrap .tl .ib svg { width: 10px; height: 10px; }
-    .wrap .bar { height: 31px; padding: 0 4px; gap: 1px; }
-    .wrap .bar .ib { width: 24px; height: 24px; }
-    .wrap .bar .ib svg { width: 11px; height: 11px; }
-    .wrap .cur { padding: 0 2px 0 10px; font-size: 9px; }
-    .wrap .bstar { width: 13px; height: 24px; }
-    .wrap .bstar svg { width: 11px; height: 11px; }
-    .wrap .filt { height: 31px; padding: 0 10px 0 9px; gap: 4px; font-size: 7.5px; }
-    .wrap .filt svg { width: 10px; height: 10px; }
-    .wrap .hfix { width: 26px; height: 26px; }
-    .wrap .hh { font-size: 9px; }
+    /* ----- 하단 버튼들: 원래 크기의 72% ----- */
+    .wrap { gap: 9px; }
+    .wrap .bottom { gap: 7px; }
+    .wrap .tl { height: 32px; padding: 0 4px; gap: 1px; }
+    .wrap .tl .pg { padding: 0 9px 0 10px; font-size: 9.5px; }
+    .wrap .tl .ib { width: 24px; height: 24px; }
+    .wrap .tl .ib svg { width: 12px; height: 12px; }
+    .wrap .bar { height: 37px; padding: 0 4px; gap: 1px; }
+    .wrap .bar .ib { width: 29px; height: 29px; }
+    .wrap .bar .ib svg { width: 14px; height: 14px; }
+    .wrap .cur { padding: 0 3px 0 12px; font-size: 11px; }
+    .wrap .bstar { width: 16px; height: 29px; }
+    .wrap .bstar svg { width: 13px; height: 13px; }
+    .wrap .filt { height: 37px; padding: 0 12px 0 11px; gap: 5px; font-size: 9px; }
+    .wrap .filt svg { width: 12px; height: 12px; }
+    .wrap .hfix { width: 32px; height: 32px; }
+    .wrap .hh { font-size: 11px; }
     @media (max-width: 520px) {
-      .wrap { gap: 6px; }
-      .wrap .tl { height: 24px; }
-      .wrap .tl .ib { width: 18px; height: 18px; }
-      .wrap .bar, .wrap .filt { height: 29px; }
-      .wrap .bar .ib { width: 22px; height: 22px; }
-      .wrap .cur { font-size: 8.5px; padding-left: 7px; }
-      .wrap .bstar { width: 11px; height: 22px; }
-      .wrap .bstar svg { width: 10px; height: 10px; }
+      .wrap { gap: 7px; }
+      .wrap .tl { height: 29px; }
+      .wrap .tl .ib { width: 22px; height: 22px; }
+      .wrap .bar, .wrap .filt { height: 35px; }
+      .wrap .bar .ib { width: 26px; height: 26px; }
+      .wrap .cur { font-size: 10px; padding-left: 9px; }
+      .wrap .bstar { width: 14px; height: 26px; }
+      .wrap .bstar svg { width: 12px; height: 12px; }
     }
+    /* ----- 검색: 태그 버튼과 고른 태그 ----- */
+    .stags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .stags:empty { display: none; }
+    .stags .chip { border: 1px solid var(--border); font: inherit; font-size: 12px; color: #fff; -webkit-appearance: none; appearance: none; }
+    .stags .chip .tn { font-size: 10.5px; opacity: .75; margin-right: 4px; }
+    .ssel .chip { padding-right: 7px; }
+    .ssel .chip .cx { margin-left: 6px; width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+      font-size: 9px; background: rgba(255, 255, 255, 0.18); }
+    .sadd .chip::before { content: '+'; margin-right: 4px; font-weight: 800; opacity: .8; }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
@@ -3315,6 +3324,7 @@
     let bmStars = null;
     let bmSetStars = null;
     let sItems = [], sIdx = -1;
+    let sTags = [];
     let sInput = null;
     let sgSeq = 0;
     let bmId = null;
@@ -3541,9 +3551,67 @@
     });
     scrim.addEventListener('mousedown', e => e.preventDefault());
 
+    const tagCls = ty => (ty === 'female' ? ' f' : ty === 'male' ? ' m' : (ty && ty !== 'tag' ? ' a' : ''));
+    const tagView = tag => {
+      const raw = tag.replace(/^-/, '');
+      const i = raw.indexOf(':');
+      const ty = i > 0 ? raw.slice(0, i) : 'tag';
+      return { ty, name: (i > 0 ? raw.slice(i + 1) : raw).replace(/_/g, ' '), neg: tag[0] === '-' };
+    };
+    function chipBtn(cls, ty, name, neg) {
+      const b = el('button', 'chip' + cls);
+      b.type = 'button';
+      if (ty && ty !== 'tag') b.appendChild(el('span', 'tn', TY_KR[ty] || ty));
+      b.appendChild(document.createTextNode((neg ? '제외 ' : '') + name));
+      // 눌러도 입력칸의 키보드가 내려가지 않게
+      b.addEventListener('mousedown', e => e.preventDefault());
+      return b;
+    }
+    function paintSel() {
+      const box = panel.querySelector('#ssel');
+      if (!box) return;
+      box.textContent = '';
+      sTags.forEach(tag => {
+        const v = tagView(tag);
+        const b = chipBtn(tagCls(v.ty), v.ty, v.name, v.neg);
+        b.title = '눌러서 빼기';
+        b.appendChild(el('span', 'cx', '✕'));
+        b.addEventListener('click', () => {
+          haptic();
+          sTags = sTags.filter(t => t !== tag);
+          paintSel();
+          if (sInput) renderSgs(sInput.value);
+        });
+        box.appendChild(b);
+      });
+    }
+    function addTag(tag) {
+      haptic();
+      if (sTags.indexOf(tag) < 0) sTags.push(tag);
+      if (sInput) {
+        const v = sInput.value;
+        sInput.value = v.slice(0, v.lastIndexOf(' ') + 1);
+        try { sInput.focus({ preventScroll: true }); } catch (e) {}
+      }
+      paintSel();
+      renderSgs(sInput ? sInput.value : '');
+    }
+    function paintTagBtns(items) {
+      const box = panel.querySelector('#sadd');
+      if (!box) return;
+      box.textContent = '';
+      items.filter(it => it.tag && sTags.indexOf(it.tag) < 0).slice(0, 12).forEach(it => {
+        const b = chipBtn(tagCls(it.ty), it.ty, it.t, it.tag[0] === '-');
+        b.title = '검색 필터에 추가';
+        b.addEventListener('click', () => addTag(it.tag));
+        box.appendChild(b);
+      });
+    }
+
     function paintSgs(items, word, emptyMsg) {
       const list = panel.querySelector('#sgl');
       if (!list) return;
+      paintTagBtns(items);
       sItems = items;
       sIdx = -1;
       list.textContent = '';
@@ -3620,9 +3688,11 @@
     }
 
     function submit(raw) {
-      const s = String(raw || '').trim();
+      const typed = String(raw || '').trim();
+      if (isNum(typed) && !sTags.length) { pushHist(typed); goTo(typed); return; }
+      const s = sTags.concat(typed ? [typed] : []).join(' ').trim();
       if (!s) { toast('품번 · 검색어 · 태그를 입력하세요'); return; }
-      if (isNum(s)) { pushHist(s); goTo(s); return; }
+      sTags = [];
       let q = s;
       if (!/language:/i.test(q)) q += ' language:korean';
       fxGo('/search.html?query=' + encodeURIComponent(q));
@@ -3657,9 +3727,14 @@
         }
       });
       r.append(inp, btn('확인', 'primary', () => submit(inp.value)));
+      const sel = el('div', 'stags ssel');
+      sel.id = 'ssel';
+      const add = el('div', 'stags sadd');
+      add.id = 'sadd';
       const list = el('div', 'sgl');
       list.id = 'sgl';
-      panel.append(r, list);
+      panel.append(r, sel, add, list);
+      paintSel();
       renderSgs('');
     }
 
