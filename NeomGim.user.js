@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.27.0
+// @version      1.28.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.27.0';
+  const VERSION = '1.28.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -178,6 +178,7 @@
     mergeTitles: true,
     blockOn: true,
     adBlock: true,
+    priv: false,
     jSort: 'date',
   };
   const settings = Object.assign({}, SETTING_DEFAULTS, store.get(KEY.settings, {}));
@@ -300,6 +301,71 @@
       } catch (e) {}
     });
   }
+
+  // ----- 비공개 -----
+  // 켜면 목록 섬네일 · 기록/일지 섬네일 · 작품 페이지를 흐리게 가리고, 꾹 누르고 있는 동안만 보여 준다.
+  onRoot(() => {
+    try {
+      const st = document.createElement('style');
+      st.id = 'hk-priv-css';
+      st.textContent =
+        'html.hk-priv:not(.hk-peek) img, html.hk-priv:not(.hk-peek) canvas {' +
+        'filter: blur(28px) saturate(.6) !important; }' +
+        'html.hk-priv img, html.hk-priv canvas { transition: filter .18s ease; }';
+      (document.head || document.documentElement).appendChild(st);
+      if (settings.priv) document.documentElement.classList.add('hk-priv');
+    } catch (e) {}
+  });
+  function applyPriv() {
+    const on = !!settings.priv;
+    try { document.documentElement.classList.toggle('hk-priv', on); } catch (e) {}
+    document.querySelectorAll('.hk-card-host').forEach(h => h.classList.toggle('hk-pv', on));
+    try {
+      const r = host && host.shadowRoot && host.shadowRoot.getElementById('root');
+      if (r) r.classList.toggle('priv', on);
+    } catch (e) {}
+    if (!on) peekOff();
+  }
+  const peekDown = new Set();
+  let peekT = 0, peekEls = [];
+  function peekOff() {
+    clearTimeout(peekT);
+    peekT = 0;
+    try { document.documentElement.classList.remove('hk-peek'); } catch (e) {}
+    peekEls.forEach(n => n.classList.remove(n._hkPk));
+    peekEls = [];
+  }
+  window.addEventListener('pointerdown', e => {
+    if (!settings.priv) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    peekDown.add(e.pointerId);
+    if (peekDown.size > 1) return;
+    peekOff();
+    const path = e.composedPath ? e.composedPath() : [];
+    const hit = [];
+    let inUI = false;
+    for (const n of path) {
+      if (!n || !n.classList) continue;
+      if (n.classList.contains('hk-card-host')) { n._hkPk = 'hk-peekc'; hit.push(n); break; }
+      if (n.classList.contains('item') || n.classList.contains('pvc')) { n._hkPk = 'peek'; hit.push(n); break; }
+      if (n.id === 'hk-host') inUI = true;
+    }
+    const page = IS_READER && !hit.length && !inUI;
+    if (!hit.length && !page) return;
+    // 그냥 누르기(넘기기)에는 보이지 않고, 잠깐 누르고 있어야 보인다
+    peekT = setTimeout(() => {
+      peekT = 0;
+      hit.forEach(n => n.classList.add(n._hkPk));
+      peekEls = hit;
+      if (page) document.documentElement.classList.add('hk-peek');
+    }, 140);
+  }, true);
+  ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, e => {
+    peekDown.delete(e.pointerId);
+    if (!peekDown.size) peekOff();
+  }, true));
+  window.addEventListener('blur', () => { peekDown.clear(); peekOff(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { peekDown.clear(); peekOff(); } });
 
   // 새로고침 직후 원래 히토미 화면이 잠깐 보이지 않도록, 스크립트가 시작되자마자 (모든 페이지에서) 화면을 가린다.
   // 첫 정리가 끝나면 걷히고, 혹시 문제가 생겨도 3초 뒤에는 저절로 걷힌다.
@@ -602,6 +668,9 @@
     .card.hk-on { visibility: visible; animation: hkCardIn .5s ease backwards; }
     @keyframes hkCardIn { from { opacity: 0; } to { opacity: 1; } }
     .thumb { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: block; cursor: pointer; }
+    :host(.hk-pv) .thumb { overflow: hidden; }
+    :host(.hk-pv) .thumb img { transition: filter .18s ease; }
+    :host(.hk-pv:not(.hk-peekc)) .thumb img { filter: blur(16px) saturate(.6) !important; }
     .thumb picture { display: block !important; width: 100% !important; height: 100% !important; }
     .card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
     .thumb img {
@@ -840,6 +909,8 @@
     .toast .tact:active { transform: scale(.9); transition-duration: .1s; }
     .panel.mini { width: auto; min-width: 220px; padding: 14px 16px; }
     .panel.sortp { width: 180px; }
+    .root.priv .item img, .root.priv .pvc img, .root.priv .pvc canvas { transition: filter .18s ease; }
+    .root.priv .item:not(.peek) img, .root.priv .pvc:not(.peek) img, .root.priv .pvc:not(.peek) canvas { filter: blur(10px) saturate(.6); }
     .panel.blooming, .toast.blooming {
       -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
       background: rgba(30, 30, 34, 0.97) !important; backface-visibility: hidden;
@@ -1940,7 +2011,7 @@
 
   function buildCardHost(media, readerUrl, title, id, seenIds, meta) {
     const cardHost = document.createElement('div');
-    cardHost.className = 'hk-card-host';
+    cardHost.className = 'hk-card-host' + (settings.priv ? ' hk-pv' : '');
     cardHost.style.cssText = 'display:block;';
     const sh = cardHost.attachShadow({ mode: 'open' });
     if (cardSheet) sh.adoptedStyleSheets = [cardSheet];
@@ -3219,7 +3290,7 @@
 
     sh.innerHTML = `
       <style>${PANEL_CSS}</style>
-      <div class="root" id="root">
+      <div class="root${settings.priv ? ' priv' : ''}" id="root">
         <div class="scrim" id="scrim"></div>
         <div class="glass" id="glass"></div>
         ${IS_WORK_PAGE ? '' : '<div class="fxtop"></div><div class="fxbot"></div>'}
@@ -4739,7 +4810,8 @@
         ['koreanOnly', 'Only Korean'],
         ['infinite', 'Unlimited scroll'],
         ['blockOn', 'Block'],
-        ['adBlock', 'Ad Block']
+        ['adBlock', 'Ad Block'],
+        ['priv', '비공개']
       ].forEach(([key, label]) => {
         const t = el('div', 'tog' + (key in pendingSet ? (pendingSet[key] ? ' on' : '') : (settings[key] ? ' on' : '')), label);
         t.setAttribute('role', 'switch');
@@ -4767,6 +4839,7 @@
           saveSettings();
           setTog(t, settings[key]);
           if (key === 'blockOn') { applyBlocks(); mergeDuplicates(); }
+          if (key === 'priv') applyPriv();
           if (key === 'preload' && settings.preload) {
             if (IS_READER) initReaderPreload();
             else warmPages();
@@ -4881,6 +4954,7 @@
         [HI.globe, 'Only Korean', '한국어 작품만 보여요. 바꾸면 새로고침해서 적용해요.'],
         [HI.inf, 'Unlimited scroll', '목록을 끝없이 이어 붙여요.'],
         [HI.block, 'Block', '차단한 작품 · 작가를 숨겨요. 차단 목록에서 풀 수 있어요.'],
+        [HI.hold, '비공개', '섬네일과 작품 페이지를 흐리게 가려요. 꾹 누르고 있는 동안만 보이고, 작품에서는 끌어서 넘기기가 막혀요.'],
         [HI.block, 'Ad Block', '광고 스크립트, 새 창 광고, 광고 칸을 막아요. 바꾸면 새로고침해서 적용해요.'],
         [ICON.copy, '내보내기 · 가져오기', '일지를 복사해 두거나 다시 불러와요.']
       ]
@@ -6884,7 +6958,7 @@
         if (Math.abs(dx) < DRAG_START && Math.abs(dy) < DRAG_START) return;
         suppressClick = true;
         if (zoom > 1.01) drag.mode = 1;
-        else if (Math.abs(dx) > Math.abs(dy) * 1.2) { drag.mode = 2; dragBegin(dx > 0 ? 1 : -1); }
+        else if (Math.abs(dx) > Math.abs(dy) * 1.2 && !settings.priv) { drag.mode = 2; dragBegin(dx > 0 ? 1 : -1); }
         else { drag.mode = 3; return; }
       }
       if (drag.mode === 1) {
