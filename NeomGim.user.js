@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.28.0
+// @version      1.29.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.28.0';
+  const VERSION = '1.29.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -309,10 +309,25 @@
       const st = document.createElement('style');
       st.id = 'hk-priv-css';
       st.textContent =
-        'html.hk-priv:not(.hk-peek) img, html.hk-priv:not(.hk-peek) canvas {' +
+        'html.hk-priv:not(.hk-rd) img, html.hk-priv:not(.hk-rd) canvas {' +
         'filter: blur(28px) saturate(.6) !important; }' +
-        'html.hk-priv img, html.hk-priv canvas { transition: filter .18s ease; }';
+        // 리더: 화면 전체를 덮는 흐림 막. 꾹 누르면 손가락 둘레만 구멍이 뚫려 선명하게 보인다
+        '#hk-priv-ov { position: fixed !important; top: 0 !important; right: 0 !important; bottom: 0 !important; left: 0 !important;' +
+        'z-index: 2147483646 !important; pointer-events: none !important; display: none !important;' +
+        '-webkit-backdrop-filter: blur(28px) saturate(.6); backdrop-filter: blur(28px) saturate(.6); background: rgba(0, 0, 0, .01); }' +
+        'html.hk-priv #hk-priv-ov { display: block !important; }' +
+        'html.hk-priv.hk-peek #hk-priv-ov {' +
+        '-webkit-mask-image: radial-gradient(circle 120px at var(--hk-mx, 50%) var(--hk-my, 50%), transparent 55%, #000 100%);' +
+        'mask-image: radial-gradient(circle 120px at var(--hk-mx, 50%) var(--hk-my, 50%), transparent 55%, #000 100%); }';
       (document.head || document.documentElement).appendChild(st);
+      if (IS_READER) {
+        document.documentElement.classList.add('hk-rd');
+        const ov = document.createElement('div');
+        ov.id = 'hk-priv-ov';
+        document.documentElement.appendChild(ov);
+        // 사이트가 문서를 다시 그려도 막이 남아 있게
+        setInterval(() => { if (!ov.isConnected && document.documentElement) document.documentElement.appendChild(ov); }, 1000);
+      }
       if (settings.priv) document.documentElement.classList.add('hk-priv');
     } catch (e) {}
   });
@@ -327,13 +342,38 @@
     if (!on) peekOff();
   }
   const peekDown = new Set();
-  let peekT = 0, peekEls = [];
+  let peekT = 0, peekEls = [], peekHeld = false;
+  function peekAt(e) {
+    try {
+      const de = document.documentElement;
+      de.style.setProperty('--hk-mx', e.clientX + 'px');
+      de.style.setProperty('--hk-my', e.clientY + 'px');
+      peekEls.concat(peekPend).forEach(n => {
+        if (!n.classList.contains('hk-card-host')) return;
+        const r = n.getBoundingClientRect();
+        n.style.setProperty('--hk-cx', (e.clientX - r.left) + 'px');
+        n.style.setProperty('--hk-cy', (e.clientY - r.top) + 'px');
+      });
+    } catch (err) {}
+  }
+  let peekPend = [];
+  window.addEventListener('pointermove', e => {
+    if (!settings.priv || !peekDown.has(e.pointerId)) return;
+    peekAt(e);
+  }, true);
+  window.addEventListener('click', e => {
+    if (!peekHeld) return;
+    peekHeld = false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
   function peekOff() {
     clearTimeout(peekT);
     peekT = 0;
     try { document.documentElement.classList.remove('hk-peek'); } catch (e) {}
     peekEls.forEach(n => n.classList.remove(n._hkPk));
     peekEls = [];
+    peekPend = [];
   }
   window.addEventListener('pointerdown', e => {
     if (!settings.priv) return;
@@ -341,6 +381,7 @@
     peekDown.add(e.pointerId);
     if (peekDown.size > 1) return;
     peekOff();
+    peekHeld = false;
     const path = e.composedPath ? e.composedPath() : [];
     const hit = [];
     let inUI = false;
@@ -352,9 +393,13 @@
     }
     const page = IS_READER && !hit.length && !inUI;
     if (!hit.length && !page) return;
-    // 그냥 누르기(넘기기)에는 보이지 않고, 잠깐 누르고 있어야 보인다
+    peekPend = hit;
+    peekAt(e);
+    // 그냥 누르기(넘기기)에는 보이지 않고, 잠깐 누르고 있어야 보인다. 그렇게 꾹 누른 뒤에는 손을 떼도 넘어가지 않는다
     peekT = setTimeout(() => {
       peekT = 0;
+      peekHeld = true;
+      peekPend = [];
       hit.forEach(n => n.classList.add(n._hkPk));
       peekEls = hit;
       if (page) document.documentElement.classList.add('hk-peek');
@@ -364,7 +409,7 @@
     peekDown.delete(e.pointerId);
     if (!peekDown.size) peekOff();
   }, true));
-  window.addEventListener('blur', () => { peekDown.clear(); peekOff(); });
+  window.addEventListener('blur', () => { peekDown.clear(); peekOff(); peekHeld = false; });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { peekDown.clear(); peekOff(); } });
 
   // 새로고침 직후 원래 히토미 화면이 잠깐 보이지 않도록, 스크립트가 시작되자마자 (모든 페이지에서) 화면을 가린다.
@@ -668,9 +713,13 @@
     .card.hk-on { visibility: visible; animation: hkCardIn .5s ease backwards; }
     @keyframes hkCardIn { from { opacity: 0; } to { opacity: 1; } }
     .thumb { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: block; cursor: pointer; }
-    :host(.hk-pv) .thumb { overflow: hidden; }
-    :host(.hk-pv) .thumb img { transition: filter .18s ease; }
-    :host(.hk-pv:not(.hk-peekc)) .thumb img { filter: blur(16px) saturate(.6) !important; }
+    .pvo { display: none; position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none;
+      -webkit-backdrop-filter: blur(16px) saturate(.6); backdrop-filter: blur(16px) saturate(.6); background: rgba(0, 0, 0, .01); }
+    :host(.hk-pv) .pvo { display: block; }
+    :host(.hk-pv.hk-peekc) .pvo {
+      -webkit-mask-image: radial-gradient(circle 70px at var(--hk-cx, 50%) var(--hk-cy, 50%), transparent 50%, #000 100%);
+      mask-image: radial-gradient(circle 70px at var(--hk-cx, 50%) var(--hk-cy, 50%), transparent 50%, #000 100%);
+    }
     .thumb picture { display: block !important; width: 100% !important; height: 100% !important; }
     .card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
     .thumb img {
@@ -746,6 +795,7 @@
   const CARD_HTML = `
     <div class="card">
       <a class="thumb"></a>
+      <div class="pvo"></div>
       <button class="grp" type="button" style="display:none"></button>
       <div class="grplist" style="display:none"></div>
       <div class="info">
