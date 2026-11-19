@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.29.0
+// @version      1.30.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.29.0';
+  const VERSION = '1.30.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -914,8 +914,19 @@
 
     .bottom {
       display: flex; align-items: center; justify-content: flex-end;
-      flex-wrap: wrap; gap: 10px; max-width: 100%;
+      flex-wrap: nowrap; gap: 10px; max-width: none;
     }
+    .bottom > * { flex-shrink: 0; }
+    /* 화면 폭에 맞춰 줄이기 (줄바꿈 대신). 값은 스크립트가 --k 로 넣는다 */
+    .wrap { max-width: none; }
+    .wrap > .bottom, .wrap > .tl { scale: var(--k, 1); transform-origin: 100% 100%; }
+    .wrap > .tl { translate: 0 var(--kb, 0px); }
+    .wrap > .stack { translate: 0 var(--ks, 0px); }
+    /* 작품 안에서는 버튼을 옅게 해서 그림을 덜 가리게 한다 (누르거나 팝업이 열리면 또렷하게) */
+    .root.rd .wrap > .tl, .root.rd .wrap > .bottom { opacity: .42; transition: opacity .25s ease; }
+    .root.rd.pop .wrap > .tl, .root.rd.pop .wrap > .bottom,
+    .root.rd .wrap > .tl:active, .root.rd .wrap > .bottom:active,
+    .root.rd .wrap > .tl:has(.pr), .root.rd .wrap > .bottom:has(.pr) { opacity: 1; transition-duration: .1s; }
     .filt {
       -webkit-appearance: none; appearance: none; border: 1px solid rgba(255, 255, 255, 0.26); flex: none; cursor: pointer;
       display: inline-flex; align-items: center; gap: 7px;
@@ -3340,7 +3351,7 @@
 
     sh.innerHTML = `
       <style>${PANEL_CSS}</style>
-      <div class="root${settings.priv ? ' priv' : ''}" id="root">
+      <div class="root${settings.priv ? ' priv' : ''}${IS_READER ? ' rd' : ''}" id="root">
         <div class="scrim" id="scrim"></div>
         <div class="glass" id="glass"></div>
         ${IS_WORK_PAGE ? '' : '<div class="fxtop"></div><div class="fxbot"></div>'}
@@ -3367,6 +3378,37 @@
 
     const $ = sel => sh.querySelector(sel);
     const root = $('#root');
+    // 하단 버튼 줄이 화면 폭보다 넓으면 줄바꿈하지 않고 통째로 작게 줄인다
+    function fitBar() {
+      const wrap = $('#wrap'), bottom = sh.querySelector('.bottom');
+      if (!wrap || !bottom) return;
+      const kids = Array.from(bottom.children).filter(c => c.offsetWidth);
+      const gap = parseFloat(getComputedStyle(bottom).columnGap) || 10;
+      let need = kids.reduce((a, c) => a + c.offsetWidth, 0) + gap * Math.max(0, kids.length - 1);
+      const tl = $('#tl');
+      if (tl && tl.offsetWidth > need) need = tl.offsetWidth;
+      const side = parseFloat(getComputedStyle(wrap).right) || 16;
+      const avail = (window.innerWidth || 390) - side * 2;
+      const k = need > avail ? Math.max(0.6, avail / need) : 1;
+      const hb = bottom.offsetHeight, ht = tl && tl.offsetHeight ? tl.offsetHeight + 12 : 0;
+      wrap.style.setProperty('--k', k.toFixed(4));
+      wrap.style.setProperty('--kb', ((1 - k) * hb).toFixed(1) + 'px');
+      wrap.style.setProperty('--ks', ((1 - k) * (hb + ht)).toFixed(1) + 'px');
+    }
+    let fitRaf = 0;
+    const fitSoon = () => { if (!fitRaf) fitRaf = requestAnimationFrame(() => { fitRaf = 0; fitBar(); }); };
+    window.addEventListener('resize', fitSoon);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', fitSoon);
+    try {
+      const mo = new MutationObserver(fitSoon);
+      mo.observe(sh.querySelector('.bottom') || root, { childList: true, subtree: true, characterData: true });
+      if (typeof ResizeObserver === 'function') {
+        const ro = new ResizeObserver(fitSoon);
+        sh.querySelectorAll('.bottom > *, #tl').forEach(n => ro.observe(n));
+      }
+    } catch (e) {}
+    requestAnimationFrame(fitBar);
+    setTimeout(fitBar, 600);
     { const t = $('#tl'); if (t && !t.querySelector('button, .pg')) t.remove(); }
     let barFrom = null;
     try {
