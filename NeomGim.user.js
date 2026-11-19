@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.26.0
+// @version      1.27.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.26.0';
+  const VERSION = '1.27.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -840,6 +840,10 @@
     .toast .tact:active { transform: scale(.9); transition-duration: .1s; }
     .panel.mini { width: auto; min-width: 220px; padding: 14px 16px; }
     .panel.sortp { width: 180px; }
+    .panel.blooming, .toast.blooming {
+      -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+      background: rgba(30, 30, 34, 0.97) !important; backface-visibility: hidden;
+    }
     .panel.mini .val { margin-bottom: 10px; }
 
     .panel.hist { display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 0; }
@@ -2969,7 +2973,7 @@
     return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t));
   };
   function bloomFrames(G, closing) {
-    const Ts = G.dist.map(d => closing ? Math.min(330, 170 + d * 0.32) : Math.min(640, 300 + d * 0.7));
+    const Ts = G.dist.map(d => closing ? Math.min(230, 120 + d * 0.22) : Math.min(400, 190 + d * 0.42));
     const D = Math.max.apply(null, Ts), T0 = Math.min.apply(null, Ts);
     const N = 48, out = [];
     for (let i = 0; i < N; i++) {
@@ -3011,7 +3015,9 @@
     const G = (from && from.isConnected && !REDUCED_MOTION()) ? bloomGeom(e, from) : null;
     if (G) {
       const f = bloomFrames(G, false);
-      e.animate(f.frames, { duration: f.dur, easing: 'linear' });
+      e.classList.add('blooming');
+      const a = e.animate(f.frames, { duration: f.dur, easing: 'linear' });
+      a.onfinish = a.oncancel = () => e.classList.remove('blooming');
       if (g && g.animate) g.animate(f.frames, { duration: f.dur, easing: 'linear' });
       return;
     }
@@ -3030,14 +3036,16 @@
     const finish = () => {
       clearAnims([e, g]);
       if (g) g.classList.remove('on');
-      e.classList.remove('open', 'out');
+      e.classList.remove('open', 'out', 'blooming');
       if (after) after();
     };
     if (!e.animate) { e._t = setTimeout(finish, 230); return; }
     const G = (to && to.isConnected && !REDUCED_MOTION()) ? bloomGeom(e, to) : null;
     if (G) {
       const f = bloomFrames(G, true);
+      e.classList.add('blooming');
       const a = e.animate(f.frames, { duration: f.dur, easing: 'linear', fill: 'forwards' });
+      a.oncancel = () => e.classList.remove('blooming');
       if (g && g.animate) g.animate(f.frames, { duration: f.dur, easing: 'linear', fill: 'forwards' });
       a.onfinish = finish;
       return;
@@ -5380,7 +5388,23 @@
         const wasOpen = panel.classList.contains('open') && !panel.classList.contains('out');
         scrim.classList.add('on');
         if (metaOpen()) closeMeta();
-        if (prev && wasOpen) {
+        const ob = prev && btnFor[prev] ? $(btnFor[prev]) : null;
+        const nb = btnFor[mode] ? $(btnFor[mode]) : null;
+        if (prev && wasOpen && ob && nb && ob !== nb && panel.animate) {
+          const r = panel.getBoundingClientRect();
+          const gh = panel.cloneNode(true);
+          gh.removeAttribute('id');
+          gh.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+          gh.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;` +
+            'margin:0;max-height:none;z-index:3;pointer-events:none;';
+          root.appendChild(gh);
+          gh.scrollTop = panel.scrollTop;
+          popClose(gh, null, () => gh.remove(), ob);
+          setTimeout(() => { if (gh.isConnected) gh.remove(); }, 800);
+          panel.getAnimations().forEach(a => a.cancel());
+          panel.classList.remove('open', 'out', 'blooming');
+          showPanel(mode);
+        } else if (prev && wasOpen) {
           morphPanel(mode, my);
         } else {
           showPanel(mode);
