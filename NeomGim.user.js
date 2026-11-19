@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.24.0
+// @version      1.25.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.24.0';
+  const VERSION = '1.25.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -137,6 +137,7 @@
       } catch (e) { return def; }
     },
     set(key, val) {
+      if (key === KEY.saved) setTimeout(() => { try { refreshCardStars(); } catch (e) {} }, 0);
       const s = JSON.stringify(val);
       try {
         if (typeof GM_setValue === 'function') { GM_setValue(key, s); return; }
@@ -650,6 +651,10 @@
       -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent 100%);
       mask-image: linear-gradient(to right, #000 calc(100% - 44px), transparent 100%);
     }
+    .cst { display: none; margin-bottom: 2px; font-size: 11px; line-height: 1.1; letter-spacing: 1px; color: rgba(0, 0, 0, 0.18); white-space: nowrap; }
+    .cst.on { display: block; }
+    .cst b { font-weight: 400; color: #f2a400; }
+    .cst.life b { color: #e8a600; text-shadow: 0 0 6px rgba(255, 200, 40, 0.55); }
     .title a {
       display: block; white-space: nowrap; overflow: hidden; text-overflow: clip;
       color: #000; text-decoration: none;
@@ -675,6 +680,7 @@
       <button class="grp" type="button" style="display:none"></button>
       <div class="grplist" style="display:none"></div>
       <div class="info">
+        <div class="cst" aria-hidden="true"></div>
         <div class="title"><a></a></div>
         <div class="dline"></div>
       </div>
@@ -1951,6 +1957,7 @@
     cardHost._hkInfo = { id, title, meta: meta || { artists: [], groups: [], tags: [] } };
     if (pgReady.has(String(id))) sh.querySelector('.card').classList.add('ready');
     sh.querySelector('.card').classList.toggle('viewed', seenIds.has(id));
+    paintCardStars(sh, id);
 
     const grp = sh.querySelector('.grp'), grpList = sh.querySelector('.grplist');
     grp.addEventListener('click', e => {
@@ -2046,6 +2053,32 @@
     hideStrayTiles(root);
   }
 
+  // 일지에 있는 작품은 제목 위에 별점을 보여 준다 (인생작은 별 6개)
+  function paintCardStars(sh, id) {
+    const box = sh && sh.querySelector('.cst');
+    if (!box) return;
+    const it = saved.find(x => String(x.id) === String(id));
+    const n = it ? Math.max(0, Math.min(5, +it.stars || 0)) : 0;
+    const life = !!(it && it.life);
+    if (!it || (!n && !life)) { box.classList.remove('on', 'life'); box.textContent = ''; return; }
+    const k = (life ? 6 : n) + '|' + (life ? 6 : 5);
+    if (box.dataset.k === k && box.classList.contains('on')) return;
+    box.dataset.k = k;
+    box.textContent = '';
+    const got = life ? 6 : n, all = life ? 6 : 5;
+    const b = document.createElement('b');
+    b.textContent = '★'.repeat(got);
+    box.appendChild(b);
+    if (all > got) box.appendChild(document.createTextNode('★'.repeat(all - got)));
+    box.classList.add('on');
+    box.classList.toggle('life', life);
+  }
+  function refreshCardStars() {
+    document.querySelectorAll('.hk-card-host').forEach(h => {
+      if (h.shadowRoot) paintCardStars(h.shadowRoot, h.dataset.hkId);
+    });
+  }
+
   function refreshViewed() {
     const set = new Set(watched.map(w => w.id));
     document.querySelectorAll('.hk-card-host').forEach(h => {
@@ -2096,6 +2129,7 @@
     const before = JSON.stringify([saved, watched]);
     saved = store.get(KEY.saved, []);
     watched = store.get(KEY.watched, []);
+    try { refreshCardStars(); } catch (e) {}
     const b = store.get(KEY.block, null) || {};
     blocks.works = Array.isArray(b.works) ? b.works : [];
     blocks.artists = Array.isArray(b.artists) ? b.artists : [];
