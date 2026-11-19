@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.31.0
+// @version      1.32.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.31.0';
+  const VERSION = '1.32.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -846,7 +846,7 @@
     .wrap > .tl, .wrap > .bottom > * { pointer-events: auto; }
     .bottom { pointer-events: none; }
     .wrap {
-      position: fixed; right: 16px; bottom: 16px; z-index: 2;
+      position: fixed; right: 16px; bottom: calc(16px + var(--hk-vb, 0px)); z-index: 2;
       display: flex; flex-direction: column; align-items: flex-end; gap: 12px;
       max-width: calc(100vw - 32px);
       transition: transform .3s var(--ease);
@@ -1431,7 +1431,7 @@
     }
 
     @media (max-width: 520px) {
-      .wrap { right: 10px; bottom: 10px; gap: 10px; }
+      .wrap { right: 10px; bottom: calc(10px + var(--hk-vb, 0px)); gap: 10px; }
       .bar, .filt { height: 48px; }
       .tl { height: 40px; }
       .cur { font-size: 14px; padding-left: 12px; }
@@ -1526,7 +1526,7 @@
     img { -webkit-user-drag: none !important; user-drag: none !important; }
 
     #mobileImages {
-      position: fixed !important; top: 0 !important; left: 0 !important;
+      position: fixed !important; top: var(--hk-vt, 0px) !important; left: 0 !important;
       width: var(--hk-vw, 100%) !important; height: var(--hk-vh, 100%) !important;
       display: flex !important; align-items: center !important; justify-content: center !important;
       margin: 0 !important; padding: 0 !important; overflow: hidden !important; background: transparent !important;
@@ -3398,8 +3398,17 @@
     }
     let fitRaf = 0;
     const fitSoon = () => { if (!fitRaf) fitRaf = requestAnimationFrame(() => { fitRaf = 0; fitBar(); }); };
-    window.addEventListener('resize', fitSoon);
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', fitSoon);
+    // 아래쪽 툴바에 가려지는 높이 (iOS 26 사파리): 하단 버튼을 그만큼 올린다
+    const setVB = () => {
+      try { document.documentElement.style.setProperty('--hk-vb', (viewBox().tb || 0) + 'px'); } catch (e) {}
+    };
+    setVB();
+    window.addEventListener('resize', () => { setVB(); fitSoon(); });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => { setVB(); fitSoon(); });
+      window.visualViewport.addEventListener('scroll', setVB);
+    }
+    setInterval(setVB, 1000);
     try {
       const mo = new MutationObserver(fitSoon);
       mo.observe(sh.querySelector('.bottom') || root, { childList: true, subtree: true, characterData: true });
@@ -6347,8 +6356,42 @@
     return null;
   }
 
+  // 실제로 보이는 영역 (iOS 26 사파리: 주소창·툴바가 고정 요소 위를 덮거나 위치가 밀리는 문제 대응)
+  // 아이폰 사파리는 스크롤을 막은 화면(리더)에서 아래 툴바가 펼쳐져 있어도 innerHeight 를 툴바가 접힌 큰 값으로
+  // 알려 줄 때가 있다 (그래서 그림이 아래로 밀리고 하단 버튼이 툴바 밑에 숨었다).
+  // 툴바가 펼쳐진 상태의 높이(100svh)를 재서, 리더에서는 그 높이를 보이는 영역으로 쓴다.
+  let svhProbe = null;
+  function svhPx() {
+    try {
+      if (!svhProbe) {
+        svhProbe = document.createElement('div');
+        svhProbe.setAttribute('aria-hidden', 'true');
+        svhProbe.style.cssText = 'position:fixed!important;left:-9px!important;top:0!important;width:1px!important;' +
+          'height:100svh!important;visibility:hidden!important;pointer-events:none!important;';
+      }
+      if (!svhProbe.isConnected) (document.body || document.documentElement).appendChild(svhProbe);
+      return svhProbe.offsetHeight || 0;
+    } catch (e) { return 0; }
+  }
+  function viewBox() {
+    const vv = window.visualViewport;
+    const iw = Math.round(window.innerWidth), ih = Math.round(window.innerHeight);
+    let h = ih, t = 0;
+    if (vv && vv.height && !(vv.scale && Math.abs(vv.scale - 1) > 0.02)) {
+      h = Math.round(Math.min(ih, vv.height));
+      t = Math.max(0, Math.min(ih - h, Math.round(vv.offsetTop || 0)));
+    }
+    let tb = 0;
+    if (IS_IOS && IS_READER) {
+      const sv = svhPx();
+      if (sv > 200 && sv < h) { tb = h - sv; h = sv; }
+    }
+    return { w: iw, h, t, b: Math.max(0, ih - h - t), tb };
+  }
+  function viewH() { return viewBox().h; }
+
   function fitLayer(src, nw, nh) {
-    const vw = window.innerWidth, vh = window.innerHeight;
+    const vw = window.innerWidth, vh = viewH();
     const s = Math.min(vw / (nw || 1), vh / (nh || 1));
     const w = (nw || 1) * s, h = (nh || 1) * s;
     const layer = document.createElement('div');
@@ -6376,7 +6419,7 @@
     const f = (files && files[idx]) || {};
     const ref = shown || {};
     const nw = +f.width || ref.nw || 1000, nh = +f.height || ref.nh || 1414;
-    const vw = window.innerWidth, vh = window.innerHeight;
+    const vw = window.innerWidth, vh = viewH();
     const s = Math.min(vw / nw, vh / nh);
     const w = nw * s, h = nh * s;
     const layer = document.createElement('div');
@@ -6411,7 +6454,7 @@
     layer._ph = false;
     layer._info = info;
     if (curLayer === layer) shown = info;
-    const vw = window.innerWidth, vh = window.innerHeight;
+    const vw = window.innerWidth, vh = viewH();
     const s = Math.min(vw / (info.nw || 1), vh / (info.nh || 1));
     const w = (info.nw || 1) * s, h = (info.nh || 1) * s;
     const im = readyEl(info.src) || new Image();
@@ -6453,6 +6496,26 @@
       .catch(() => {
         if (curLayer === layer && layer._ph && layer.isConnected) { ++turnSeq; endChain(); }
       });
+  }
+
+  // 보이는 영역이 바뀌면 남아 있는 페이지 그림들을 새 영역에 맞춰 다시 놓는다
+  function refitShown() {
+    if (!turnWrap) return;
+    const vw = window.innerWidth, vh = viewH();
+    const ls = new Set(Array.from(turnWrap.children));
+    prep.forEach(p => { if (p && p.layer) ls.add(p.layer); });
+    ls.forEach(l => {
+      const inf = l && l._info;
+      if (!inf || !inf.nw || !inf.nh) return;
+      const k = Math.min(vw / inf.nw, vh / inf.nh);
+      const w = inf.nw * k, h = inf.nh * k;
+      l.querySelectorAll('img.hk-pg').forEach(n => {
+        n.style.setProperty('left', ((vw - w) / 2) + 'px', 'important');
+        n.style.setProperty('top', ((vh - h) / 2) + 'px', 'important');
+        n.style.setProperty('width', w + 'px', 'important');
+        n.style.setProperty('height', h + 'px', 'important');
+      });
+    });
   }
 
   // 넘기는 중이 아닐 때, 지금 쓰고 있지 않은 레이어가 남아 있으면 치운다 (렉으로 남은 페이지가 위를 덮지 않게)
@@ -6513,7 +6576,7 @@
     if (!turnWrap) {
       turnWrap = document.createElement('div');
       turnWrap.className = 'hk-wrap';
-      turnWrap.style.cssText = 'position:fixed!important;left:0!important;top:0!important;right:0!important;bottom:0!important;' +
+      turnWrap.style.cssText = 'position:fixed!important;left:0!important;top:var(--hk-vt,0px)!important;right:0!important;height:var(--hk-vh,100%)!important;' +
         'pointer-events:none!important;overflow:hidden!important;z-index:2147483601!important;';
       writeZoomVars(turnWrap);
     }
@@ -7199,14 +7262,29 @@
 
   function initReaderViewport() {
     const root = document.documentElement;
+    let last = '';
     function fxViewport() {
-      root.style.setProperty('--hk-vw', Math.round(window.innerWidth) + 'px');
-      root.style.setProperty('--hk-vh', Math.round(window.innerHeight) + 'px');
+      const v = viewBox();
+      const sig = v.w + '|' + v.h + '|' + v.t;
+      root.style.setProperty('--hk-vw', v.w + 'px');
+      root.style.setProperty('--hk-vh', v.h + 'px');
+      root.style.setProperty('--hk-vt', v.t + 'px');
+      if (sig !== last && last) {
+        last = sig;
+        // 보이는 영역이 바뀌면 지금 페이지 그림도 새 영역 가운데에 다시 맞춘다
+        try { if (typeof refitShown === 'function') refitShown(); } catch (e) {}
+      }
+      last = sig;
     }
     fxViewport();
     window.addEventListener('resize', fxViewport);
     window.addEventListener('orientationchange', () => setTimeout(fxViewport, 200));
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', fxViewport);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', fxViewport);
+      window.visualViewport.addEventListener('scroll', fxViewport);
+    }
+    // 사파리가 이벤트 없이 영역을 바꾸는 경우가 있어서 가끔 다시 잰다
+    setInterval(fxViewport, 1000);
   }
 
   let fxInfo = null;
