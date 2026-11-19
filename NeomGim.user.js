@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.25.0
+// @version      1.26.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.25.0';
+  const VERSION = '1.26.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -2928,53 +2928,66 @@
     list.forEach(x => { if (x && x.getAnimations) x.getAnimations().forEach(a => a.cancel()); });
   }
 
-  // 버튼에서 피어나는 팝업 (iOS 처럼): 팝업의 네 변이 버튼 자리에서 출발해 제자리로 퍼진다.
-  // 버튼에 가까운 변은 빨리, 먼 변은 천천히 도착해서 모양이 버튼 쪽에서 늘어나듯 보인다.
+  // 버튼에서 피어나는 팝업 (iOS 처럼): 팝업 전체가 버튼 크기로 접혀 있다가 펼쳐진다.
+  // 네 꼭짓점이 각자 버튼의 같은 꼭짓점에서 출발하고, 버튼에서 먼 꼭짓점일수록 늦게 도착한다.
+  // 꼭짓점 넷을 따로 움직이므로 원근 변환(matrix3d)으로 팝업을 통째로 변형한다 → 안의 요소가 잘리지 않고 같이 커진다.
   function bloomGeom(e, from) {
     const r = e.getBoundingClientRect(), b = from.getBoundingClientRect();
-    if (!r.width || !r.height || !b.width) return null;
-    // 버튼을 팝업 안쪽 가장 가까운 자리로 옮겨 시작 사각형으로 쓴다
-    const bw = Math.min(b.width, r.width), bh = Math.min(b.height, r.height);
-    const cx = Math.max(r.left + bw / 2, Math.min(r.right - bw / 2, b.left + b.width / 2));
-    const cy = Math.max(r.top + bh / 2, Math.min(r.bottom - bh / 2, b.top + b.height / 2));
-    const st = { t: cy - bh / 2 - r.top, l: cx - bw / 2 - r.left, b: r.bottom - (cy + bh / 2), rr: r.right - (cx + bw / 2) };
-    // 변마다 버튼(실제 위치)에서의 거리 → 거리가 멀수록 오래 걸린다
-    const bx = b.left + b.width / 2, by = b.top + b.height / 2;
-    const dist = { t: Math.abs(by - r.top), b: Math.abs(by - r.bottom), l: Math.abs(bx - r.left), rr: Math.abs(bx - r.right) };
-    const rad0 = Math.min(bw, bh) / 2;
-    const rad1 = parseFloat(getComputedStyle(e).borderTopLeftRadius) || 26;
-    return { st, dist, rad0, rad1, dx: b.left + b.width / 2 - (r.left + r.width / 2), dy: by - (r.top + r.height / 2) };
+    if (!r.width || !r.height || !b.width || !b.height) return null;
+    const W = e.offsetWidth || r.width, H = e.offsetHeight || r.height;
+    const sx = r.width / W, sy = r.height / H;
+    // 팝업 기준 좌표(변형 전 크기)로 바꾼다
+    const L = x => (x - r.left) / sx, T = y => (y - r.top) / sy;
+    const end = [[0, 0], [W, 0], [W, H], [0, H]];
+    const start = [[L(b.left), T(b.top)], [L(b.right), T(b.top)], [L(b.right), T(b.bottom)], [L(b.left), T(b.bottom)]];
+    const cx = L(b.left + b.width / 2), cy = T(b.top + b.height / 2);
+    const dist = end.map(([x, y]) => Math.hypot(x - cx, y - cy));
+    return { W, H, start, end, dist };
   }
-  // 임계 감쇠에 가까운 스프링 진행도 (0 → 1, 아주 살짝 넘침)
+  // 정사각형 → 임의 사각형 원근 변환
+  function quadMatrix(W, H, q) {
+    const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
+    const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+    const dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+    let a, b, c, d, e, f, g = 0, h = 0;
+    const det = dx1 * dy2 - dx2 * dy1;
+    if ((Math.abs(dx3) < 1e-6 && Math.abs(dy3) < 1e-6) || Math.abs(det) < 1e-9) {
+      a = x1 - x0; b = x2 - x1; c = x0; d = y1 - y0; e = y2 - y1; f = y0;
+    } else {
+      g = (dx3 * dy2 - dx2 * dy3) / det;
+      h = (dx1 * dy3 - dx3 * dy1) / det;
+      a = x1 - x0 + g * x1; b = x3 - x0 + h * x3; c = x0;
+      d = y1 - y0 + g * y1; e = y3 - y0 + h * y3; f = y0;
+    }
+    const n = v => (Math.abs(v) < 1e-9 ? 0 : +v.toFixed(7));
+    return `matrix3d(${n(a / W)},${n(d / W)},0,${n(g / W)},${n(b / H)},${n(e / H)},0,${n(h / H)},0,0,1,0,${n(c)},${n(f)},0,1)`;
+  }
+  // 살짝 넘치는 스프링 진행도 (0 → 1)
   const springP = (t, T) => {
     if (t >= T) return 1;
-    const w = 7.2 / T, z = 0.86, wd = w * Math.sqrt(1 - z * z);
+    const w = 7.6 / T, z = 0.8, wd = w * Math.sqrt(1 - z * z);
     return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t));
   };
   function bloomFrames(G, closing) {
-    const T = {};
-    let D = 0;
-    ['t', 'b', 'l', 'rr'].forEach(k => {
-      T[k] = closing ? 190 + G.dist[k] * 0.35 : 300 + G.dist[k] * 0.75;
-      T[k] = Math.min(T[k], closing ? 360 : 680);
-      D = Math.max(D, T[k]);
-    });
-    const N = 40, out = [];
+    const Ts = G.dist.map(d => closing ? Math.min(330, 170 + d * 0.32) : Math.min(640, 300 + d * 0.7));
+    const D = Math.max.apply(null, Ts), T0 = Math.min.apply(null, Ts);
+    const N = 48, out = [];
     for (let i = 0; i < N; i++) {
       const t = D * i / (N - 1);
-      const P = {};
-      ['t', 'b', 'l', 'rr'].forEach(k => {
-        P[k] = closing ? 1 - Math.min(1, t / T[k]) * Math.min(1, t / T[k]) * (3 - 2 * Math.min(1, t / T[k])) : springP(t, T[k]);
+      const q = G.end.map((p, k) => {
+        let P;
+        if (closing) { const u = Math.min(1, t / Ts[k]); P = 1 - u * u * (3 - 2 * u); }
+        else P = springP(t, Ts[k]);
+        return [G.start[k][0] + (p[0] - G.start[k][0]) * P, G.start[k][1] + (p[1] - G.start[k][1]) * P];
       });
-      const avg = (P.t + P.b + P.l + P.rr) / 4;
-      const ins = k => (G.st[k] * (1 - P[k])).toFixed(1) + 'px';
-      const rad = (G.rad0 + (G.rad1 - G.rad0) * Math.max(0, Math.min(1, avg))).toFixed(1);
       const last = !closing && i === N - 1;
+      // 열 때: 가장 가까운 꼭짓점이 도착하기 전에 다 불투명해진다. 닫을 때: 끝 무렵에 사라진다
+      const op = closing ? Math.max(0, Math.min(1, (D - t) / (D * 0.45)))
+        : Math.min(1, t / (T0 * 0.55));
       out.push({
-        clipPath: last ? 'inset(0px 0px 0px 0px round ' + G.rad1 + 'px)'
-          : `inset(${ins('t')} ${ins('rr')} ${ins('b')} ${ins('l')} round ${rad}px)`,
-        transform: last ? 'none' : `translate(${(G.dx * (1 - avg) * 0.08).toFixed(2)}px, ${(G.dy * (1 - avg) * 0.08).toFixed(2)}px)`,
-        opacity: closing ? Math.max(0, Math.min(1, avg * 1.6)).toFixed(3) : Math.min(1, 0.35 + avg * 1.2).toFixed(3)
+        transformOrigin: '0 0',
+        transform: last ? 'none' : quadMatrix(G.W, G.H, q),
+        opacity: +op.toFixed(3)
       });
     }
     return { frames: out, dur: D };
