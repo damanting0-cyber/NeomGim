@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.32.0
+// @version      1.33.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.32.0';
+  const VERSION = '1.33.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -1119,7 +1119,7 @@
       flex: 1 1 0; min-width: 0; width: 100%; height: 38px; padding: 0 14px; border-radius: 999px;
       border: 1px solid var(--border); background: rgba(255, 255, 255, 0.07);
       box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.22);
-      color: #fff; font: inherit; font-size: 14px; outline: none;
+      color: #fff; font: inherit; font-size: 16px; outline: none;
       transition: border-color .25s var(--ease), background .25s var(--ease), box-shadow .3s var(--ease);
     }
     .field::placeholder { color: var(--sub); }
@@ -7260,8 +7260,40 @@
     window.addEventListener('resize', () => { if (zoom > 1.01) { measurePan(); applyPan(); } });
   }
 
+  function lockPageZoom(force) {
+    try {
+      let m = document.querySelector('meta[name="viewport"]');
+      if (!m) {
+        m = document.createElement('meta');
+        m.name = 'viewport';
+        (document.head || document.documentElement).appendChild(m);
+      }
+      const want = 'width=device-width, initial-scale=1, maximum-scale=1';
+      if (force || m.getAttribute('content') !== want) {
+        // 같은 값을 다시 넣으면 사파리가 무시하므로 살짝 바꿨다가 되돌린다
+        m.setAttribute('content', 'width=device-width, initial-scale=1.0001, maximum-scale=1.0001');
+        requestAnimationFrame(() => m.setAttribute('content', want));
+      }
+    } catch (e) {}
+  }
   function initReaderViewport() {
     const root = document.documentElement;
+    lockPageZoom(false);
+    let zoomFixAt = 0;
+    const checkZoom = () => {
+      const vv = window.visualViewport;
+      if (!vv || !vv.scale || Math.abs(vv.scale - 1) < 0.02) return;
+      const now = Date.now();
+      if (now - zoomFixAt < 600) return;
+      zoomFixAt = now;
+      lockPageZoom(true);
+      try { window.scrollTo(0, 0); } catch (e) {}
+    };
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', checkZoom);
+      window.visualViewport.addEventListener('scroll', checkZoom);
+    }
+    setInterval(checkZoom, 800);
     let last = '';
     function fxViewport() {
       const v = viewBox();
