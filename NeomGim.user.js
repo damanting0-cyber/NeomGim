@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.30.0
+// @version      1.31.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.30.0';
+  const VERSION = '1.31.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -975,6 +975,7 @@
     .panel.blooming, .toast.blooming {
       -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
       background: rgba(30, 30, 34, 0.97) !important; backface-visibility: hidden;
+      pointer-events: none !important;
     }
     .panel.mini .val { margin-bottom: 10px; }
 
@@ -3853,6 +3854,8 @@
 
     scrim.addEventListener('click', () => {
       if (cmenu) { closeCardMenu(); return; }
+      // 팝업이 막 펼쳐지는 중(손가락을 받지 않음)에 그 자리를 누른 것은 닫기로 치지 않는다
+      if (panel.classList.contains('blooming')) return;
       setPanel(null, true);
     });
     scrim.addEventListener('mousedown', e => e.preventDefault());
@@ -5556,7 +5559,8 @@
         if (metaOpen()) closeMeta();
         const ob = prev && btnFor[prev] ? $(btnFor[prev]) : null;
         const nb = btnFor[mode] ? $(btnFor[mode]) : null;
-        if (prev && wasOpen && ob && nb && ob !== nb && panel.animate) {
+        let swapped = false;
+        if (prev && wasOpen && ob && nb && ob !== nb && panel.animate) try {
           const r = panel.getBoundingClientRect();
           const gh = panel.cloneNode(true);
           gh.removeAttribute('id');
@@ -5569,7 +5573,14 @@
           setTimeout(() => { if (gh.isConnected) gh.remove(); }, 800);
           panel.getAnimations().forEach(a => a.cancel());
           panel.classList.remove('open', 'out', 'blooming');
+          swapped = true;
           showPanel(mode);
+        } catch (err) {
+          if (!swapped) { panel.classList.remove('open', 'out', 'blooming'); showPanel(mode); }
+          swapped = true;
+        }
+        if (swapped) {
+          // 위에서 처리함
         } else if (prev && wasOpen) {
           morphPanel(mode, my);
         } else {
@@ -5624,7 +5635,7 @@
         if (b.classList.contains('bstar')) return;
         if (!panelMode) return;
         // 다른 팝업 버튼이면 그대로 넘겨서 열린 팝업 안에서 전환한다
-        if (MODE_OF[b.id] && !b.classList.contains('active')) return;
+        if (MODE_OF[b.id] && btnFor[panelMode] !== '#' + b.id) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         setPanel(null, true);
