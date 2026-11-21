@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.34.0
+// @version      1.35.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.34.0';
+  const VERSION = '1.35.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -7461,46 +7461,83 @@
     }, 150);
   });
 
-  function showEmptyResult() {
-    if (document.getElementById('hk-empty')) return;
-    document.documentElement.style.setProperty('background-color', '#111111', 'important');
-    if (document.body) {
-      document.body.style.setProperty('background-color', '#111111', 'important');
-      Array.from(document.body.children).forEach(ch => {
-        if (!(ch.id && ch.id.indexOf('hk-') === 0)) ch.classList.add('hk-vanish');
-      });
+  // 검색 결과 없음 / 검색 중 안내.
+  // 태그 검색은 히토미가 큰 색인을 받아야 해서 폰에서는 몇 초~십몇 초 걸린다. 예전에는 3초 안에 결과가 없으면
+  // '작품이 없습니다'로 화면을 덮어 버려서, 늦게 도착한 결과가 그 아래에 가려졌다.
+  // 이제는 '찾는 중'을 보여 주다가 결과가 오면 바로 걷고, 오래 기다려도 없을 때만 '없습니다'로 바꾼다.
+  let emptyBox = null, emptyHidden = [], emptyObs = null, emptyFinalT = 0;
+  function searchQueryText() {
+    return searchQueryOf(location.search).replace(/\s*language:korean/i, '')
+      .split(/\s+/).filter(t => t && !/^orderby(key|direction)?:/i.test(t)).join(' ').trim();
+  }
+  function hasResults() {
+    const gc = document.querySelector('.gallery-content');
+    return !!(gc && Array.from(gc.children).some(c => c.querySelector('a[href]')));
+  }
+  function clearEmpty() {
+    clearTimeout(emptyFinalT);
+    if (emptyObs) { emptyObs.disconnect(); emptyObs = null; }
+    if (emptyBox) { emptyBox.remove(); emptyBox = null; }
+    emptyHidden.forEach(ch => ch.classList.remove('hk-vanish'));
+    emptyHidden = [];
+  }
+  function showEmptyResult(final) {
+    if (hasResults()) { clearEmpty(); return; }
+    const q = searchQueryText();
+    if (!emptyBox) {
+      document.documentElement.style.setProperty('background-color', '#111111', 'important');
+      if (document.body) {
+        document.body.style.setProperty('background-color', '#111111', 'important');
+        Array.from(document.body.children).forEach(ch => {
+          if (ch.id && ch.id.indexOf('hk-') === 0) return;
+          if (ch.classList.contains('hk-vanish')) return;
+          // 결과가 들어올 목록은 가리지 않는다 (비어 있으니 보이는 것도 없다)
+          if (ch.querySelector && ch.querySelector('.gallery-content')) return;
+          ch.classList.add('hk-vanish');
+          emptyHidden.push(ch);
+        });
+      }
+      emptyBox = document.createElement('div');
+      emptyBox.id = 'hk-empty';
+      emptyBox.style.cssText =
+        'position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;' +
+        'display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;' +
+        'gap:10px!important;background:transparent!important;color:#c9c9d1!important;z-index:1!important;pointer-events:none!important;' +
+        'font:500 15px/1.5 -apple-system,"Malgun Gothic",sans-serif!important;text-align:center!important;padding:24px!important;';
+      document.documentElement.appendChild(emptyBox);
+      // 결과가 들어오면 바로 걷는다
+      try {
+        emptyObs = new MutationObserver(() => { if (hasResults()) clearEmpty(); });
+        emptyObs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      } catch (e) {}
     }
-    const q = (new URLSearchParams(location.search).get('query') || '')
-      .replace(/\s*language:korean/i, '').trim();
-    const box = document.createElement('div');
-    box.id = 'hk-empty';
-    box.style.cssText =
-      'position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;' +
-      'display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;' +
-      'gap:10px!important;background:#111111!important;color:#c9c9d1!important;z-index:1!important;' +
-      'font:500 15px/1.5 -apple-system,"Malgun Gothic",sans-serif!important;text-align:center!important;padding:24px!important;';
+    emptyBox.textContent = '';
     const t = document.createElement('div');
     t.style.cssText = 'font-weight:700!important;color:#f2f2f5!important;font-size:16px!important;';
-    t.textContent = (q ? '"' + q + '"' : '검색어') + ' 에 대한 작품이 없습니다';
-    const s = document.createElement('div');
-    s.style.cssText = 'font-size:12.5px!important;color:#8a8a95!important;';
-    s.textContent = '오른쪽 아래 H 버튼으로 히토미 홈이나 이전 목록으로 갈 수 있습니다.';
-    box.append(t, s);
-    document.documentElement.appendChild(box);
+    const sub = document.createElement('div');
+    sub.style.cssText = 'font-size:12.5px!important;color:#8a8a95!important;';
+    if (final) {
+      t.textContent = (q ? '"' + q + '"' : '검색어') + ' 에 대한 작품이 없습니다';
+      sub.textContent = '오른쪽 아래 H 버튼으로 히토미 홈이나 이전 목록으로 갈 수 있습니다.';
+    } else {
+      t.textContent = (q ? '"' + q + '"' : '') + ' 찾는 중…';
+      sub.textContent = '태그 검색은 히토미가 목록을 받아 오느라 조금 걸려요.';
+    }
+    emptyBox.append(t, sub);
   }
 
-  function checkEmptySearch() {
-    if (!IS_SEARCH || document.getElementById('hk-empty')) return;
-    const gc = document.querySelector('.gallery-content');
-    const has = gc && Array.from(gc.children).some(c => c.querySelector('a[href]'));
-    if (!has) showEmptyResult();
+  function checkEmptySearch(final) {
+    if (!IS_SEARCH) return;
+    if (hasResults()) { clearEmpty(); return; }
+    showEmptyResult(!!final);
   }
 
   function start() {
     hlog('시작 · v' + VERSION + ' · ' + location.pathname);
     if (IS_READER) fxStart();
     run();
-    [1200, 3000].forEach(ms => setTimeout(checkEmptySearch, ms));
+    setTimeout(() => checkEmptySearch(false), 2500);
+    emptyFinalT = setTimeout(() => checkEmptySearch(true), 25000);
     buildUI();
     requestAnimationFrame(() => requestAnimationFrame(endBoot));
     if (IS_READER) initReaderPreload();
