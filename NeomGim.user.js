@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.36.0
+// @version      1.38.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -10,7 +10,12 @@
 // @grant        GM_registerMenuCommand
 // @grant        unsafeWindow
 // @grant        GM_xmlhttpRequest
+// @grant        GM.getValue
+// @grant        GM.setValue
+// @grant        GM.xmlHttpRequest
 // @connect      ltn.hitomi.la
+// @connect      gold-usergeneratedcontent.net
+// @connect      tagindex.hitomi.la
 // @noframes
 // @updateURL    https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js
 // @downloadURL  https://raw.githubusercontent.com/damanting0-cyber/NeomGim/main/NeomGim.user.js
@@ -19,7 +24,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.36.0';
+  const VERSION = '1.38.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -1822,7 +1827,7 @@
     }
     const toks = searchQueryOf(location.search).split(/\s+/).filter(t => t && !/^orderby(key|direction)?:/i.test(t));
     if (key !== 'date') toks.push('orderby:popular', 'orderbykey:' + key);
-    return '/search.html?query=' + encodeURIComponent(toks.join(' '));
+    return '/search.html?' + encodeURIComponent(toks.join(' '));
   }
 
   function currentSort() {
@@ -2324,11 +2329,17 @@
   let infCount = -1;
 
   function curPageNo() {
+    if (IS_SEARCH) {
+      const h = location.hash.match(/^#(\d+)$/);
+      return h ? Math.max(1, +h[1]) : 1;
+    }
     const m = location.search.match(/[?&]page=(\d+)/);
     return m ? Math.max(1, +m[1]) : 1;
   }
 
   function pageUrl(n) {
+    // 히토미 검색 결과는 쪽 번호를 주소 끝의 #번호 로 받는다 (search.html?검색어#2)
+    if (IS_SEARCH) return location.pathname + location.search + (n > 1 ? '#' + n : '');
     let q = location.search.replace(/([?&])page=\d+&?/, '$1').replace(/[?&]$/, '');
     if (n > 1) q += (q.indexOf('?') === -1 ? '?' : '&') + 'page=' + n;
     return location.pathname + q;
@@ -2619,17 +2630,74 @@
     return host + '/images/' + path + '.' + ext;
   }
 
+  function gmXhr() {
+    if (typeof GM_xmlhttpRequest === 'function') return GM_xmlhttpRequest;
+    try { if (typeof GM !== 'undefined' && GM && typeof GM.xmlHttpRequest === 'function') return GM.xmlHttpRequest.bind(GM); } catch (e) {}
+    return null;
+  }
   function gmGet(url) {
     return new Promise((res, rej) => {
-      if (typeof GM_xmlhttpRequest !== 'function') { rej(new Error('no gm')); return; }
-      GM_xmlhttpRequest({
-        method: 'GET', url, timeout: 8000,
-        ontimeout: () => rej(new Error('timeout')),
-        onload: r => (r.status >= 200 && r.status < 300 ? res(r.responseText) : rej(new Error('HTTP ' + r.status))),
-        onerror: () => rej(new Error('network'))
-      });
+      const x = gmXhr();
+      if (!x) { rej(new Error('no gm')); return; }
+      let done = false;
+      const t = setTimeout(() => { if (!done) { done = true; rej(new Error('timeout')); } }, 9000);
+      try {
+        const r0 = x({
+          method: 'GET', url, timeout: 8000,
+          ontimeout: () => { if (!done) { done = true; clearTimeout(t); rej(new Error('timeout')); } },
+          onload: r => {
+            if (done) return;
+            done = true; clearTimeout(t);
+            (r.status >= 200 && r.status < 300 ? res(r.responseText) : rej(new Error('HTTP ' + r.status)));
+          },
+          onerror: () => { if (!done) { done = true; clearTimeout(t); rej(new Error('network')); } }
+        });
+        if (r0 && typeof r0.catch === 'function') r0.catch(() => {});
+      } catch (e) { if (!done) { done = true; clearTimeout(t); rej(e); } }
     });
   }
+
+  // ----- 그림 주소를 스스로 계산 (사이트 기능을 못 부를 때: 아이폰 Userscripts 등) -----
+  // 히토미의 gg.js(서버 번호 표·경로 앞부분)를 받아서 사이트와 같은 방식으로 주소를 만든다
+  const GG = { ok: false, set: null, hit: 1, def: 0, b: '', loading: null, at: 0 };
+  function parseGG(t) {
+    if (!t || t.indexOf('case') < 0) return false;
+    const set = new Set();
+    t.replace(/case\s+(\d+)\s*:/g, (m, n) => { set.add(+n); return m; });
+    const dm = t.match(/var\s+o\s*=\s*(\d+)/);
+    const hm = t.match(/o\s*=\s*(\d+)\s*;\s*break/);
+    const bm = t.match(/b\s*:\s*['"]([^'"]*)['"]/);
+    if (!set.size || !bm) return false;
+    GG.set = set; GG.def = dm ? +dm[1] : 0; GG.hit = hm ? +hm[1] : (GG.def ? 0 : 1); GG.b = bm[1];
+    GG.ok = true; GG.at = Date.now();
+    return true;
+  }
+  function loadGG() {
+    if (GG.ok && Date.now() - GG.at < 10 * 60 * 1000) return Promise.resolve(true);
+    if (GG.loading) return GG.loading;
+    const urls = ['https://ltn.gold-usergeneratedcontent.net/gg.js', 'https://ltn.hitomi.la/gg.js'];
+    const tryOne = i => {
+      if (i >= urls.length) return Promise.resolve(false);
+      const u = urls[i] + '?_=' + Math.floor(Date.now() / 60000);
+      return gmGet(u).catch(() => fetchT(u, { credentials: 'omit' }, 8000).then(r => (r.ok ? r.text() : '')))
+        .then(t => parseGG(t) || tryOne(i + 1)).catch(() => tryOne(i + 1));
+    };
+    GG.loading = tryOne(0).then(ok => { GG.loading = null; return ok; });
+    return GG.loading;
+  }
+  function ggImgUrl(f, dir, ext) {
+    if (!GG.ok || !f || !f.hash || f.hash.length < 3) return '';
+    const h = f.hash;
+    const m = /(..)(.)$/.exec(h);
+    const g = parseInt(m[2] + m[1], 16);
+    const mg = GG.set.has(g) ? GG.hit : GG.def;
+    const s = String(parseInt(m[2] + m[1], 16));
+    const sub = (dir === 'webp' ? 'w' : dir === 'avif' ? 'a' : 'a') + (1 + mg);
+    const d = (dir === 'webp' || dir === 'avif') ? '' : dir + '/';
+    return 'https://' + sub + '.gold-usergeneratedcontent.net/' + d + GG.b + s + '/' + h + '.' + ext;
+  }
+  // 미리 받기 상태 (설정 화면 아래에 보여 준다)
+  const preStat = { ok: 0, fail: 0, via: '', err: '' };
 
   function fetchT(url, opt, ms) {
     const ctrl = new AbortController();
@@ -2868,12 +2936,16 @@
     try {
       if (typeof w.url_from_url_from_hash === 'function') {
         const u = w.url_from_url_from_hash(gid, f, dir, ext);
-        if (typeof u === 'string' && u && u.indexOf('undefined') < 0) return u;
+        if (typeof u === 'string' && u && u.indexOf('undefined') < 0) { preStat.via = '사이트'; return u; }
       } else {
         const u = pageImgUrl(gid, f, dir, ext);
-        if (u) return u;
+        if (u) { preStat.via = '사이트(다리)'; return u; }
       }
     } catch (e) {}
+    const gu = ggImgUrl(f, dir, ext);
+    if (gu) { preStat.via = '직접 계산'; return gu; }
+    if (!GG.ok) loadGG();
+    preStat.via = '옛 방식';
     return hkImageUrl(f);
   }
 
@@ -2896,8 +2968,8 @@
     preBusy.set(idx, ctrl);
     const finish = ok => {
       preBusy.delete(idx);
-      if (ok) { preDone.add(idx); preFailAt.delete(idx); hlog('실제로 받아 보관함', idx + 1); }
-      else { preFailAt.set(idx, Date.now()); hlog('미리 받기 실패', idx + 1, u); }
+      if (ok) { preDone.add(idx); preFailAt.delete(idx); preStat.ok++; }
+      else { preFailAt.set(idx, Date.now()); preStat.fail++; preStat.err = String(u).slice(0, 60); }
     };
 
     fetch(u, { signal: ctrl.signal, cache: 'force-cache' })
@@ -2963,6 +3035,7 @@
   let readerPreOn = false;
   function initReaderPreload() {
     if (!settings.preload || readerPreOn) return;
+    loadGG();
     const gid = getCurrentId();
     if (!gid) return;
     readerPreOn = true;
@@ -4116,7 +4189,7 @@
       sTags = [];
       let q = s;
       if (!/language:/i.test(q)) q += ' language:korean';
-      fxGo('/search.html?query=' + encodeURIComponent(q));
+      fxGo('/search.html?' + encodeURIComponent(q));
     }
 
     function moveHl(d) {
@@ -4967,6 +5040,14 @@
         hb
       );
       panel.appendChild(br);
+      // 버전 · 미리 받기 상태 (문제가 있을 때 캡처해서 보내면 원인을 찾기 쉽다)
+      const info = el('div', 'hint');
+      info.style.cssText = 'margin-top:10px;font-size:11px;color:var(--sub);line-height:1.5;';
+      info.textContent = 'v' + VERSION + ' · 미리 받기 ' + (settings.preload ? '켜짐' : '꺼짐') +
+        (IS_READER ? ' · 성공 ' + preStat.ok + ' · 실패 ' + preStat.fail + ' · 주소 ' + (preStat.via || '-') +
+          ' · 작품정보 ' + (readerFiles(getCurrentId()) ? '있음' : '없음') + ' · gg ' + (GG.ok ? '있음' : '없음') : '') +
+        (preStat.err ? ' · 실패주소 ' + preStat.err : '');
+      panel.appendChild(info);
     }
 
     function setTog(t, on) {
