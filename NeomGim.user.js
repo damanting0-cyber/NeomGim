@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.33.0
+// @version      1.34.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.33.0';
+  const VERSION = '1.34.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -3081,23 +3081,16 @@
     const dist = end.map(([x, y]) => Math.hypot(x - cx, y - cy));
     return { W, H, start, end, dist };
   }
-  // 정사각형 → 임의 사각형 원근 변환
+  // 네 꼭짓점에 가장 가깝게 맞춘 평면(2D) 변형. 원근(3D) 변형은 사파리에서 팝업 안의 상자와 글자가
+  // 서로 다른 층으로 그려지면서 글자가 상자 밖으로 위아래로 튀어 보였다. 2D 변형은 모두 한 덩어리로 움직인다.
   function quadMatrix(W, H, q) {
     const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
-    const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
-    const dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
-    let a, b, c, d, e, f, g = 0, h = 0;
-    const det = dx1 * dy2 - dx2 * dy1;
-    if ((Math.abs(dx3) < 1e-6 && Math.abs(dy3) < 1e-6) || Math.abs(det) < 1e-9) {
-      a = x1 - x0; b = x2 - x1; c = x0; d = y1 - y0; e = y2 - y1; f = y0;
-    } else {
-      g = (dx3 * dy2 - dx2 * dy3) / det;
-      h = (dx1 * dy3 - dx3 * dy1) / det;
-      a = x1 - x0 + g * x1; b = x3 - x0 + h * x3; c = x0;
-      d = y1 - y0 + g * y1; e = y3 - y0 + h * y3; f = y0;
-    }
-    const n = v => (Math.abs(v) < 1e-9 ? 0 : +v.toFixed(7));
-    return `matrix3d(${n(a / W)},${n(d / W)},0,${n(g / W)},${n(b / H)},${n(e / H)},0,${n(h / H)},0,0,1,0,${n(c)},${n(f)},0,1)`;
+    const a = ((x1 - x0) + (x2 - x3)) / 2, b = ((x3 - x0) + (x2 - x1)) / 2;
+    const d = ((y1 - y0) + (y2 - y3)) / 2, e = ((y3 - y0) + (y2 - y1)) / 2;
+    const c = (x0 + x1 + x2 + x3) / 4 - a / 2 - b / 2;
+    const f = (y0 + y1 + y2 + y3) / 4 - d / 2 - e / 2;
+    const n = v => (Math.abs(v) < 1e-9 ? 0 : +v.toFixed(6));
+    return `matrix(${n(a / W)},${n(d / W)},${n(b / H)},${n(e / H)},${n(c)},${n(f)})`;
   }
   // 살짝 넘치는 스프링 진행도 (0 → 1)
   const springP = (t, T) => {
