@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NeomGim
 // @namespace    neomgim
-// @version      1.35.0
+// @version      1.36.0
 // @description  이제 편하게 넘김.
 // @match        https://hitomi.la/*
 // @run-at       document-start
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.35.0';
+  const VERSION = '1.36.0';
   const LANG = 'korean';
   const KOREAN_LINK = `/index-${LANG}.html`;
   const TOP_W = 760;
@@ -4908,7 +4908,8 @@
         ['infinite', 'Unlimited scroll'],
         ['blockOn', 'Block'],
         ['adBlock', 'Ad Block'],
-        ['priv', '비공개']
+        ['priv', '비공개'],
+        ['enabled', '사용']
       ].forEach(([key, label]) => {
         const t = el('div', 'tog' + (key in pendingSet ? (pendingSet[key] ? ' on' : '') : (settings[key] ? ' on' : '')), label);
         t.setAttribute('role', 'switch');
@@ -4922,7 +4923,7 @@
         });
         t.addEventListener('click', () => {
           haptic();
-          if (['koreanOnly', 'infinite', 'adBlock'].includes(key)) {
+          if (['koreanOnly', 'infinite', 'adBlock', 'enabled'].includes(key)) {
             // 토글은 바로 바뀌고, 저장된 값과 달라지면 위에 "새로고침할까요?" 팝업이 뜬다
             const next = !t.classList.contains('on');
             setTog(t, next);
@@ -5052,6 +5053,7 @@
         [HI.inf, 'Unlimited scroll', '목록을 끝없이 이어 붙여요.'],
         [HI.block, 'Block', '차단한 작품 · 작가를 숨겨요. 차단 목록에서 풀 수 있어요.'],
         [HI.hold, '비공개', '섬네일과 작품 페이지를 흐리게 가려요. 꾹 누르고 있는 동안만 보이고, 작품에서는 끌어서 넘기기가 막혀요.'],
+        [HI.H, '사용', '끄고 새로고침하면 NeomGim 이 멈추고 히토미 원래 화면이 나와요. 오른쪽 아래 \'NeomGim 켜기\' 로 다시 켜요.'],
         [HI.block, 'Ad Block', '광고 스크립트, 새 창 광고, 광고 칸을 막아요. 바꾸면 새로고침해서 적용해요.'],
         [ICON.copy, '내보내기 · 가져오기', '일지를 복사해 두거나 다시 불러와요.']
       ]
